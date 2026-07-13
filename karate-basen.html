@@ -220,7 +220,7 @@ function mkFighter(x, opts){
     hp:30, maxHp:30, dmgPunch:6, dmgKick:10, speed:1.6,
     pose:'idle', poseT:0, attackCd:0, hurtT:0, dead:false, invuln:0, blocking:false, ranged:false,
     walkT:0, rot:0, carried:false, isArek:false, name:'', pooled:false, pooledSunk:false,
-    mass:1, cdBase:1.3, specialCd:0, slamAir:false, squash:0,
+    mass:1, cdBase:1.3, specialCd:0, slamAir:false, squash:0, moveVx:0,
     koT:0, stopOff: Math.random()*10
   }, opts);
 }
@@ -392,13 +392,17 @@ function shockwave(a){
 }
 
 // ---------- update ----------
-let last = performance.now();
+// stały krok fizyki 60 Hz — identyczne tempo na 60/90/120 Hz (iPhone ProMotion)
+const STEP = 1/60;
+let last = performance.now(), acc = 0;
 function loop(now){
-  const dt = Math.min((now-last)/1000, 0.05); last = now;
+  let frame = (now-last)/1000; last = now;
+  if(frame > 0.25) frame = 0.25; // po uśpieniu karty nie przewijaj setek klatek
   if(paused){ draw(); requestAnimationFrame(loop); return; }
-  if(hitStop > 0){ hitStop -= dt; draw(); requestAnimationFrame(loop); return; }
-  time += dt;
-  update(dt);
+  if(hitStop > 0){ hitStop = Math.max(0, hitStop - frame); draw(); requestAnimationFrame(loop); return; }
+  acc += frame;
+  let steps = 0;
+  while(acc >= STEP && steps < 5){ time += STEP; update(STEP); acc -= STEP; steps++; }
   draw();
   requestAnimationFrame(loop);
 }
@@ -427,7 +431,8 @@ function update(dt){
 }
 
 function physics(f, dt){
-  f.x += f.vx; f.vx *= 0.82;
+  f.x += f.vx + f.moveVx; f.vx *= 0.82;
+  if(f.hurtT > 0) f.moveVx *= 0.85;
   if(!f.onGround){ f.vy += 0.55; f.y += f.vy;
     if(f.y>=GROUND){
       const impact = f.vy;
@@ -447,26 +452,30 @@ function physics(f, dt){
 }
 
 function updateFight(dt){
-  // player controls
+  // player controls (płynne przyspieszanie i hamowanie)
   const p = player;
-  let moving = false;
+  let moving = false, targetVx = 0;
   p.blocking = false;
   if(keys['s'] && p.onGround && p.hurtT<=0 && !['punch','kick'].includes(p.pose)){
-    p.blocking = true; p.pose = 'block'; p.vx *= 0.6;
+    p.blocking = true; p.pose = 'block';
   } else if(p.hurtT<=0 && !['punch','kick'].includes(p.pose) || p.poseT>0.25){
     if(p.pose==='block') p.pose='idle';
-    if(keys['arrowleft']||keys['a']){ p.vx = -p.speed; p.facing=-1; moving=true; }
-    if(keys['arrowright']||keys['d']){ p.vx = p.speed; p.facing=1; moving=true; }
+    if(keys['arrowleft']||keys['a']){ targetVx = -p.speed; p.facing=-1; moving=true; }
+    if(keys['arrowright']||keys['d']){ targetVx = p.speed; p.facing=1; moving=true; }
     if((keys['arrowup']||keys['w']||keys[' ']) && p.onGround){ p.vy=-10.6; p.onGround=false; p.squash=-0.18; }
     if(keys['j'] && p.attackCd<=0){ p.pose='punch'; p.poseT=0; p.attackCd=0.32; p.vx = p.facing*3.2; tryAttack(p, enemies, 'punch'); }
     else if(keys['k'] && p.attackCd<=0){ p.pose='kick'; p.poseT=0; p.attackCd=0.55; p.vx = p.facing*4.2; tryAttack(p, enemies, 'kick'); }
   }
   if(keys['l']){ keys['l'] = false; doSuper(); }
+  // płynne przyspieszanie/hamowanie zamiast skokowej prędkości
+  const accel = targetVx !== 0 ? 0.22 : 0.30;
+  p.moveVx += (targetVx - p.moveVx) * accel;
+  if(Math.abs(p.moveVx) < 0.04) p.moveVx = 0;
   if(p.pose==='punch'&&p.poseT>0.24) p.pose='idle';
   if(p.pose==='kick'&&p.poseT>0.31) p.pose='idle';
   if(p.pose==='hit'&&p.poseT>0.3) p.pose='idle';
   if(moving && (p.pose==='idle'||p.pose==='walk')){ p.pose='walk'; p.walkT += dt*11; }
-  else if(!moving && p.pose==='walk') p.pose='idle';
+  else if(!moving && p.pose==='walk'){ if(Math.abs(p.moveVx) < 0.5) p.pose='idle'; else p.walkT += dt*11; }
   physics(p, dt);
 
   // enemies AI
@@ -1128,32 +1137,62 @@ function drawGirl(){
 }
 
 function drawScene(){
-  // niebo + słońce
-  const sky = ctx.createLinearGradient(0,0,0,H);
-  sky.addColorStop(0,'#7ec8f0'); sky.addColorStop(0.7,'#b8e0f5'); sky.addColorStop(1,'#d9f0fa');
-  ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
-  // słońce z promieniami
-  ctx.save(); ctx.translate(90,80);
-  ctx.fillStyle='rgba(255,221,85,.25)';
-  for(let i=0;i<12;i++){ ctx.save(); ctx.rotate(i*Math.PI/6 + time*0.1);
-    ctx.fillRect(-2,-70,4,26); ctx.restore(); }
-  ctx.fillStyle='rgba(255,221,85,.3)'; ctx.beginPath(); ctx.arc(0,0,52,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#ffdd55'; ctx.beginPath(); ctx.arc(0,0,36,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#ffe680'; ctx.beginPath(); ctx.arc(-8,-8,20,0,Math.PI*2); ctx.fill();
+  const HORIZON = GROUND - 70;
+  const BX = -OX, BW = VW; // tło na całą szerokość ekranu (także pasy boczne iPhone)
+  // niebo — głębszy, nowoczesny gradient
+  const sky = ctx.createLinearGradient(0,0,0,GROUND);
+  sky.addColorStop(0,'#2f7fd6'); sky.addColorStop(0.45,'#63b3ea'); sky.addColorStop(0.8,'#a8dbf2'); sky.addColorStop(1,'#e6f6ff');
+  ctx.fillStyle = sky; ctx.fillRect(BX,0,BW,GROUND);
+  // słońce z miękką poświatą
+  ctx.save(); ctx.translate(96,78);
+  const glow = ctx.createRadialGradient(0,0,10,0,0,90);
+  glow.addColorStop(0,'rgba(255,240,170,.9)'); glow.addColorStop(0.4,'rgba(255,222,120,.35)'); glow.addColorStop(1,'rgba(255,222,120,0)');
+  ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,90,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,238,150,.5)';
+  for(let i=0;i<12;i++){ ctx.save(); ctx.rotate(i*Math.PI/6 + time*0.08); ctx.fillRect(-2.5,-72,5,26); ctx.restore(); }
+  ctx.fillStyle='#fff1b0'; ctx.beginPath(); ctx.arc(0,0,34,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fffbe0'; ctx.beginPath(); ctx.arc(-8,-8,17,0,Math.PI*2); ctx.fill();
   ctx.restore();
-  // chmury dryfujące
-  ctx.fillStyle='rgba(255,255,255,.85)';
-  [[240,90,1,10],[520,60,0.8,7],[760,110,1.2,13],[100,140,0.6,5]].forEach(([cx0,cy,cs,spd])=>{
-    const cx = ((cx0 + time*spd) % (W+140)) - 70;
+  // chmury dryfujące (miękkie, dwuwarstwowe)
+  [[240,84,1,10],[520,56,0.8,7],[760,104,1.2,13],[100,134,0.6,5]].forEach(([cx0,cy,cs,spd])=>{
+    const cx = ((cx0 + time*spd) % (W+160)) - 80;
+    ctx.fillStyle='rgba(255,255,255,.92)';
     ctx.beginPath();
-    ctx.arc(cx,cy,20*cs,0,Math.PI*2); ctx.arc(cx+22*cs,cy-8*cs,16*cs,0,Math.PI*2); ctx.arc(cx+44*cs,cy,18*cs,0,Math.PI*2);
-    ctx.fill();
+    ctx.arc(cx,cy,20*cs,0,Math.PI*2); ctx.arc(cx+22*cs,cy-9*cs,16*cs,0,Math.PI*2); ctx.arc(cx+44*cs,cy,18*cs,0,Math.PI*2);
+    ctx.arc(cx+22*cs,cy+4*cs,15*cs,0,Math.PI*2); ctx.fill();
   });
-  // podłoże / płytki
-  ctx.fillStyle='#e0cda8'; ctx.fillRect(0,GROUND,W,H-GROUND);
-  ctx.strokeStyle='rgba(0,0,0,.08)'; ctx.lineWidth=1;
-  for(let x=0;x<W;x+=48){ ctx.beginPath(); ctx.moveTo(x,GROUND); ctx.lineTo(x,H); ctx.stroke(); }
-  ctx.fillStyle='#c9b48b'; ctx.fillRect(0,GROUND,W,5);
+  // dalekie morze na horyzoncie + wyspy
+  const sea = ctx.createLinearGradient(0,HORIZON,0,GROUND);
+  sea.addColorStop(0,'#3aa0d8'); sea.addColorStop(1,'#2b7fc0');
+  ctx.fillStyle=sea; ctx.fillRect(BX,HORIZON,BW,GROUND-HORIZON);
+  ctx.fillStyle='#5aa06a';
+  [[180,26],[430,20],[880,30]].forEach(([ix,ih])=>{
+    ctx.beginPath(); ctx.moveTo(ix-ih*1.8,HORIZON+2);
+    ctx.quadraticCurveTo(ix,HORIZON-ih, ix+ih*1.8,HORIZON+2); ctx.closePath(); ctx.fill();
+  });
+  ctx.fillStyle='rgba(255,255,255,.4)';
+  for(let i=0;i<5;i++){ const yy=HORIZON+10+i*10; ctx.fillRect(BX, yy, BW, 1.5); }
+  // mewy
+  ctx.strokeStyle='rgba(40,50,70,.55)'; ctx.lineWidth=2; ctx.lineCap='round';
+  [[0,60,17],[1,40,11],[2,150,9]].forEach(([k,gy,spd])=>{
+    const gx=((k*260 + time*spd) % (W+80))-40, fl=Math.sin(time*4+k)*3;
+    ctx.beginPath(); ctx.moveTo(gx-8,gy+fl); ctx.quadraticCurveTo(gx,gy-4+fl,gx+2,gy+fl);
+    ctx.quadraticCurveTo(gx+4,gy-4+fl,gx+12,gy+fl); ctx.stroke();
+  });
+  // pomost — drewniane deski
+  const plankH = (H-GROUND)/4;
+  for(let r=0;r<4;r++){
+    const y=GROUND+r*plankH;
+    const pg=ctx.createLinearGradient(0,y,0,y+plankH);
+    pg.addColorStop(0, r%2? '#c4934f':'#cf9f60'); pg.addColorStop(0.5,'#bd8f52'); pg.addColorStop(1, r%2?'#b3854a':'#c1955a');
+    ctx.fillStyle=pg; ctx.fillRect(BX,y,BW,plankH-1.5);
+    ctx.fillStyle='rgba(90,60,25,.35)'; ctx.fillRect(BX,y+plankH-2,BW,2);
+  }
+  ctx.strokeStyle='rgba(80,52,20,.28)'; ctx.lineWidth=1.5;
+  for(let x=BX-(BX%128)-64;x<BX+BW;x+=128){ for(let r=0;r<4;r++){ const off=(r%2)*64; ctx.beginPath(); ctx.moveTo(x+off,GROUND+r*plankH); ctx.lineTo(x+off,GROUND+(r+1)*plankH); ctx.stroke(); } }
+  // krawędź pomostu (cień pod nogami)
+  ctx.fillStyle='rgba(255,255,255,.18)'; ctx.fillRect(BX,GROUND,BW,2);
+  ctx.fillStyle='rgba(60,40,15,.3)'; ctx.fillRect(BX,GROUND+4,BW,3);
   // basen
   ctx.fillStyle='#d7e9f2'; ctx.fillRect(POOL.x-8, POOL.top-4, POOL.w+16, POOL.depth+14);
   const water = ctx.createLinearGradient(0,POOL.top,0,POOL.top+POOL.depth);
@@ -1189,17 +1228,24 @@ function drawScene(){
   ctx.save(); ctx.clip();
   for(let i=-2;i<3;i+=2) ctx.fillRect(870+i*18-8, GROUND-180, 16, 70);
   ctx.restore();
-  // palma
-  ctx.strokeStyle='#8b5a2b'; ctx.lineWidth=10; ctx.lineCap='round';
-  ctx.beginPath(); ctx.moveTo(52, GROUND); ctx.quadraticCurveTo(38, GROUND-90, 60, GROUND-165); ctx.stroke();
-  ctx.fillStyle='#2e8b57';
-  for(let i=0;i<6;i++){
-    ctx.save(); ctx.translate(60, GROUND-165); ctx.rotate(-0.15 - i*0.52);
-    ctx.beginPath(); ctx.ellipse(32, 0, 36, 10, 0, 0, Math.PI*2); ctx.fill();
+  // palma — lekko kołysząca się na wietrze
+  const sway = Math.sin(time*1.2)*6, topX = 60+sway, topY = GROUND-165;
+  const trunk = ctx.createLinearGradient(46,0,66,0);
+  trunk.addColorStop(0,'#7a4a22'); trunk.addColorStop(1,'#9c6a34');
+  ctx.strokeStyle=trunk; ctx.lineWidth=11; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(52, GROUND); ctx.quadraticCurveTo(38, GROUND-90, topX, topY); ctx.stroke();
+  // segmenty pnia
+  ctx.strokeStyle='rgba(90,55,20,.35)'; ctx.lineWidth=1.5;
+  for(let i=1;i<7;i++){ const t2=i/7, yy=GROUND-(GROUND-topY)*t2; ctx.beginPath(); ctx.moveTo(48-sway*t2*0.3, yy); ctx.lineTo(58+sway*t2, yy); ctx.stroke(); }
+  for(let i=0;i<7;i++){
+    ctx.save(); ctx.translate(topX, topY); ctx.rotate(-0.15 - i*0.45 + Math.sin(time*1.5+i)*0.05);
+    const lg=ctx.createLinearGradient(0,0,44,0); lg.addColorStop(0,'#2e8b57'); lg.addColorStop(1,'#3fb56e');
+    ctx.fillStyle=lg;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(24,-6,46,2); ctx.quadraticCurveTo(24,6,0,0); ctx.fill();
     ctx.restore();
   }
-  ctx.fillStyle='#5b3a1a';
-  ctx.beginPath(); ctx.arc(52, GROUND-158, 6, 0, Math.PI*2); ctx.arc(66, GROUND-155, 6, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#6b4a1a';
+  ctx.beginPath(); ctx.arc(topX-7, topY+6, 5, 0, Math.PI*2); ctx.arc(topX+6, topY+8, 5, 0, Math.PI*2); ctx.fill();
   // leżak
   ctx.save(); ctx.translate(505, GROUND);
   ctx.strokeStyle='#a97442'; ctx.lineWidth=4; ctx.lineCap='round';
@@ -1232,16 +1278,6 @@ function drawScene(){
 
 function draw(){
   ctx.save();
-  if(OX > 0){
-    // pasy boczne: kontynuacja nieba i pomostu — pełny ekran na telefonie
-    const sky = ctx.createLinearGradient(0,0,0,H);
-    sky.addColorStop(0,'#7ec8f0'); sky.addColorStop(0.7,'#b8e0f5'); sky.addColorStop(1,'#d9f0fa');
-    ctx.fillStyle = sky; ctx.fillRect(0,0,VW,H);
-    ctx.fillStyle='#e0cda8'; ctx.fillRect(0,GROUND,VW,H-GROUND);
-    ctx.strokeStyle='rgba(0,0,0,.08)'; ctx.lineWidth=1;
-    for(let x = OX%48 - 48; x < VW; x += 48){ ctx.beginPath(); ctx.moveTo(x,GROUND); ctx.lineTo(x,H); ctx.stroke(); }
-    ctx.fillStyle='#c9b48b'; ctx.fillRect(0,GROUND,VW,5);
-  }
   ctx.translate(OX, 0);
   if(shake>0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
   drawScene();
@@ -1337,6 +1373,11 @@ function draw(){
     ctx.fillStyle=p.color; ctx.fillText(p.txt, p.x, p.y);
   }
   ctx.globalAlpha = 1;
+
+  // winieta — delikatne przyciemnienie rogów (kinowy sznyt), pod HUD
+  const vig = ctx.createRadialGradient(W/2, H*0.46, H*0.35, W/2, H*0.5, H*0.95);
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(10,14,30,0.32)');
+  ctx.fillStyle=vig; ctx.fillRect(-OX,0,VW,H);
 
   // błysk super-ciosu
   if(flashT>0){ ctx.fillStyle='rgba(255,255,240,'+Math.min(0.65,flashT*2.2).toFixed(2)+')'; ctx.fillRect(-OX,0,VW,H); }
