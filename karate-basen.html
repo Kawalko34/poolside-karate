@@ -37,14 +37,17 @@
   body.touchmode #topbtns{display:flex;}
   #topbtns .tbtn{width:44px;height:44px;font-size:19px;}
   /* iPhone / dotyk: gra na cały ekran, canvas dopasowany, przyciski na wierzchu */
-  body.touchmode{justify-content:center;min-height:100vh;min-height:100dvh;overflow:hidden;
-    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  body.touchmode{justify-content:flex-start;min-height:100vh;min-height:100dvh;overflow:hidden;padding:0;}
   body.touchmode h1{display:none;}
   body.touchmode #hint{display:none;}
-  body.touchmode canvas{width:100vw;height:100dvh;max-width:none;aspect-ratio:auto;border-radius:0;box-shadow:none;}
-  body.touchmode #touch{bottom:calc(4px + env(safe-area-inset-bottom));padding:0 calc(4px + env(safe-area-inset-left)) 0 calc(4px + env(safe-area-inset-right));}
-  body.touchmode .tgroup{gap:6px;}
-  body.touchmode #touch .tbtn{width:50px;height:50px;font-size:20px;}
+  /* przyciski w osobnym pasku POD grą — nigdy nie zasłaniają akcji */
+  body.touchmode canvas{width:100vw;height:calc(100dvh - 60px - env(safe-area-inset-bottom));max-width:none;aspect-ratio:auto;border-radius:0;box-shadow:none;}
+  body.touchmode #touch{bottom:0;background:rgba(8,10,24,.78);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    border-top:1px solid rgba(255,255,255,.14);
+    padding:6px calc(8px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));}
+  body.touchmode .tgroup{gap:7px;}
+  body.touchmode #touch .tbtn{width:48px;height:48px;font-size:19px;}
   @media (orientation:portrait) and (max-width:900px){
     body.touchmode #rotate{display:flex;}
   }
@@ -86,7 +89,11 @@ const DPR = Math.min(2, window.devicePixelRatio || 1);
 let VW = W, OX = 0; // na telefonie widok poszerzony do proporcji ekranu (pełny ekran bez pasów)
 function fitViewport(){
   if(touchUI){
-    const aspect = Math.min(2.5, Math.max(16/9, (window.innerWidth||W) / (window.innerHeight||H)));
+    // mierz realny box canvasu (CSS: 100vw × wysokość ekranu minus pasek przycisków)
+    const r = cv.getBoundingClientRect();
+    const cw = r.width || (window.innerWidth||W);
+    const chh = Math.max(120, r.height || (window.innerHeight||H));
+    const aspect = Math.min(3.2, Math.max(16/9, cw / chh));
     VW = Math.round(H * aspect);
     OX = Math.round((VW - W) / 2);
   } else { VW = W; OX = 0; }
@@ -968,13 +975,14 @@ function drawStick(f){
     ctx.fillStyle = f.isArek ? '#e11' : '#ff9800';
     ctx.fillRect(f.x-bw/2, f.y-100*f.scale, bw*Math.max(0,f.hp/f.maxHp), 5);
   }
-  // imię nad głową
+  // imię nad głową (duże i czytelne)
   if(f.name && !f.dead){
-    ctx.font = 'bold ' + (f.isArek?15:12) + 'px Arial'; ctx.textAlign='center';
-    ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineJoin='round';
-    ctx.strokeText(f.name, f.x, f.y - 110*f.scale);
+    ctx.font = '900 ' + (f.isArek?22:18) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial';
+    ctx.textAlign='center';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.lineJoin='round';
+    ctx.strokeText(f.name, f.x, f.y - 112*f.scale);
     ctx.fillStyle = f.isArek ? '#ff5252' : (f===player ? '#fff' : '#ffd43b');
-    ctx.fillText(f.name, f.x, f.y - 110*f.scale);
+    ctx.fillText(f.name, f.x, f.y - 112*f.scale);
   }
 }
 
@@ -1014,8 +1022,8 @@ function bubble(x, y, txt){
 }
 
 function nameTag(text, x, y, color){
-  ctx.font = 'bold 12px Arial'; ctx.textAlign='center';
-  ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineJoin='round';
+  ctx.font = '900 18px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.textAlign='center';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.lineJoin='round';
   ctx.strokeText(text, x, y);
   ctx.fillStyle = color; ctx.fillText(text, x, y);
 }
