@@ -231,6 +231,7 @@ function mkFighter(x, opts){
 let player, enemies, arek, girl, wave, state, cut, particles, hearts, splashes, msgT, shake, time;
 let score, combo, comboT, hitStop, popups, shocks, items, balls, paused = false;
 let superCharge = 0, flashT = 0, hitFx = [];
+let camPunch = 0, slowmo = 0, dustT = 0;
 const store = (typeof localStorage !== 'undefined') ? localStorage : {getItem:()=>null, setItem:()=>{}};
 let hiScore = parseInt(store.getItem('karateBasenHi') || '0', 10);
 
@@ -248,7 +249,7 @@ function init(){
   state = 'story'; storyIdx = 0;
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
-  superCharge = 0; flashT = 0; hitFx = [];
+  superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0;
   player = mkFighter(140, {color:'#f5f5f5', beltColor:'#111', hp:140, maxHp:140, facing:1, speed:3.15, name:'GREG',
     dmgPunch:14, dmgKick:20});
   girl = {x: POOL.x - 28, y: GROUND, panicT:0, saved:false, runT:0, yOff:0, rot:0, vx:0, vy:0, sunk:false};
@@ -322,6 +323,7 @@ function tryAttack(a, targets, kind){
       const hy2 = t.y-60*t.scale;
       burst(t.x, hy2, kind==='kick' ? '#ffb300' : '#fff', 8);
       hitFx.push({x:t.x, y:hy2, r:6*t.scale, life:0.22, big:kind==='kick'}); // błysk uderzenia
+      if(a === player) camPunch = Math.max(camPunch, kind==='kick'?0.045:0.03); // uderzeniowy zoom kamery
       hit = true;
       if(t === player){
         t.invuln = 0.7;
@@ -430,6 +432,8 @@ function update(dt){
   shocks = shocks.filter(s=>s.life>0);
   hitFx.forEach(h=>{h.r += dt*(h.big?280:200); h.life -= dt;});
   hitFx = hitFx.filter(h=>h.life>0);
+  camPunch = Math.max(0, camPunch - dt*0.28);
+  if(slowmo > 0) slowmo = Math.max(0, slowmo - dt);
   if(comboT > 0){ comboT -= dt; if(comboT <= 0) combo = 0; }
   flashT = Math.max(0, flashT - dt);
 
@@ -479,6 +483,13 @@ function updateFight(dt){
   const accel = targetVx !== 0 ? 0.22 : 0.30;
   p.moveVx += (targetVx - p.moveVx) * accel;
   if(Math.abs(p.moveVx) < 0.04) p.moveVx = 0;
+  // kurz spod nóg przy biegu
+  if(p.onGround && Math.abs(p.moveVx) > 1.6){
+    dustT += dt;
+    if(dustT > 0.07){ dustT = 0;
+      particles.push({x:p.x - Math.sign(p.moveVx)*10*p.scale, y:GROUND, vx:-Math.sign(p.moveVx)*(1+Math.random()*1.5), vy:-Math.random()*1.4, life:0.4, color:'rgba(220,205,175,0.9)'});
+    }
+  }
   if(p.pose==='punch'&&p.poseT>0.24) p.pose='idle';
   if(p.pose==='kick'&&p.poseT>0.31) p.pose='idle';
   if(p.pose==='hit'&&p.poseT>0.3) p.pose='idle';
@@ -1254,6 +1265,21 @@ function drawScene(){
   }
   ctx.globalAlpha=1;
   ctx.restore();
+  // dmuchany flaming dryfujący po wodzie (życie w tle)
+  if(!(state==='lose' && cut && ['girlThrow','girlSunk'].includes(cut.phase))){
+    const fx = POOL.x + 60 + Math.sin(time*0.5)*40, fy = POOL.top + 12 + Math.sin(time*1.6)*2;
+    ctx.save(); ctx.translate(fx, fy);
+    ctx.fillStyle='#ff8fc8'; // pływak-koło
+    ctx.beginPath(); ctx.ellipse(0,4,17,9,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffb3d9'; ctx.beginPath(); ctx.ellipse(0,3,10,5,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(43,159,216,0.55)'; ctx.beginPath(); ctx.ellipse(0,4,10,5,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ff8fc8'; // szyja + głowa flaminga
+    ctx.beginPath(); ctx.moveTo(-6,2); ctx.quadraticCurveTo(-16,-16,-8,-22); ctx.quadraticCurveTo(-2,-26,-3,-18);
+    ctx.quadraticCurveTo(-6,-12,-2,2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(-6,-20,1.4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffb703'; ctx.beginPath(); ctx.moveTo(-8,-19); ctx.lineTo(-13,-18); ctx.lineTo(-8,-16); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
   // drabinka
   ctx.strokeStyle='#eee'; ctx.lineWidth=3;
   ctx.beginPath();
@@ -1325,9 +1351,11 @@ function draw(){
   ctx.save();
   ctx.translate(OX, 0);
   if(shake>0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
-  // ---- ŚWIAT (przybliżony wokół linii pomostu) ----
+  // ---- ŚWIAT (zoom bazowy + uderzeniowy zoom + delikatny dryf kamery za graczem) ----
   ctx.save();
-  ctx.translate(W/2, GROUND+18); ctx.scale(ZOOM, ZOOM); ctx.translate(-W/2, -(GROUND+18));
+  const z = ZOOM + camPunch;
+  const camX = (state==='fight' && player) ? (player.x - W/2) * 0.06 : 0;
+  ctx.translate(W/2, GROUND+18); ctx.scale(z, z); ctx.translate(-W/2 - camX, -(GROUND+18));
   drawScene();
 
   // plansze fabularne
