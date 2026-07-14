@@ -1278,13 +1278,18 @@ function drawGirl(){
   nameTag('NATALKA', g.x, g.y + g.yOff - 132, '#ff9ec6');
 }
 
+const G = {}; // bufor statycznych gradientów (wydajność — tworzone raz, nie co klatkę)
 function drawScene(){
   const HORIZON = GROUND - 70;
   const BX = -OX, BW = VW; // tło na całą szerokość ekranu (także pasy boczne iPhone)
   // niebo — głębszy, nowoczesny gradient
-  const sky = ctx.createLinearGradient(0,0,0,GROUND);
-  sky.addColorStop(0,'#2f7fd6'); sky.addColorStop(0.45,'#63b3ea'); sky.addColorStop(0.8,'#a8dbf2'); sky.addColorStop(1,'#e6f6ff');
-  ctx.fillStyle = sky; ctx.fillRect(BX,0,BW,GROUND);
+  if(!G.sky){ G.sky = ctx.createLinearGradient(0,0,0,GROUND);
+    G.sky.addColorStop(0,'#2f7fd6'); G.sky.addColorStop(0.45,'#63b3ea'); G.sky.addColorStop(0.8,'#a8dbf2'); G.sky.addColorStop(1,'#e6f6ff'); }
+  ctx.fillStyle = G.sky; ctx.fillRect(BX,0,BW,GROUND);
+  // ciepła poświata słońca (golden hour) — z lewej-górnej strony
+  if(!G.warm){ G.warm = ctx.createRadialGradient(120,60,20,120,60,GROUND*1.1);
+    G.warm.addColorStop(0,'rgba(255,225,150,0.22)'); G.warm.addColorStop(0.5,'rgba(255,210,140,0.07)'); G.warm.addColorStop(1,'rgba(255,200,120,0)'); }
+  ctx.fillStyle=G.warm; ctx.fillRect(BX,0,BW,GROUND);
   // słońce z miękką poświatą
   ctx.save(); ctx.translate(96,78);
   const glow = ctx.createRadialGradient(0,0,10,0,0,90);
@@ -1304,9 +1309,9 @@ function drawScene(){
     ctx.arc(cx+22*cs,cy+4*cs,15*cs,0,Math.PI*2); ctx.fill();
   });
   // dalekie morze na horyzoncie + wyspy
-  const sea = ctx.createLinearGradient(0,HORIZON,0,GROUND);
-  sea.addColorStop(0,'#3aa0d8'); sea.addColorStop(1,'#2b7fc0');
-  ctx.fillStyle=sea; ctx.fillRect(BX,HORIZON,BW,GROUND-HORIZON);
+  if(!G.sea){ G.sea = ctx.createLinearGradient(0,HORIZON,0,GROUND);
+    G.sea.addColorStop(0,'#3aa0d8'); G.sea.addColorStop(1,'#2b7fc0'); }
+  ctx.fillStyle=G.sea; ctx.fillRect(BX,HORIZON,BW,GROUND-HORIZON);
   ctx.fillStyle='#5aa06a';
   [[180,26],[430,20],[880,30]].forEach(([ix,ih])=>{
     ctx.beginPath(); ctx.moveTo(ix-ih*1.8,HORIZON+2);
@@ -1323,11 +1328,13 @@ function drawScene(){
   });
   // pomost — drewniane deski
   const plankH = (H-GROUND)/4;
-  for(let r=0;r<4;r++){
-    const y=GROUND+r*plankH;
+  if(!G.planks){ G.planks=[]; for(let r=0;r<4;r++){ const y=GROUND+r*plankH;
     const pg=ctx.createLinearGradient(0,y,0,y+plankH);
     pg.addColorStop(0, r%2? '#c4934f':'#cf9f60'); pg.addColorStop(0.5,'#bd8f52'); pg.addColorStop(1, r%2?'#b3854a':'#c1955a');
-    ctx.fillStyle=pg; ctx.fillRect(BX,y,BW,plankH-1.5);
+    G.planks.push(pg); } }
+  for(let r=0;r<4;r++){
+    const y=GROUND+r*plankH;
+    ctx.fillStyle=G.planks[r]; ctx.fillRect(BX,y,BW,plankH-1.5);
     ctx.fillStyle='rgba(90,60,25,.35)'; ctx.fillRect(BX,y+plankH-2,BW,2);
   }
   ctx.strokeStyle='rgba(80,52,20,.28)'; ctx.lineWidth=1.5;
@@ -1339,8 +1346,9 @@ function drawScene(){
   ctx.fillStyle='#eaf4fb'; ctx.fillRect(POOL.x-10, POOL.top-6, POOL.w+20, POOL.depth+18);
   ctx.fillStyle='#9fd0ec'; ctx.fillRect(POOL.x-10, POOL.top-6, POOL.w+20, 4);
   // woda — głęboki gradient + połysk
-  const water = ctx.createLinearGradient(0,POOL.top,0,POOL.top+POOL.depth);
-  water.addColorStop(0,'#5cc6f0'); water.addColorStop(0.5,'#2b9fd8'); water.addColorStop(1,'#0e5f9e');
+  if(!G.water){ G.water = ctx.createLinearGradient(0,POOL.top,0,POOL.top+POOL.depth);
+    G.water.addColorStop(0,'#5cc6f0'); G.water.addColorStop(0.5,'#2b9fd8'); G.water.addColorStop(1,'#0e5f9e'); }
+  const water = G.water;
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(POOL.x, POOL.top);
@@ -1598,9 +1606,9 @@ function draw(){
   ctx.restore(); // ---- koniec ŚWIATA (zoom); UI poniżej w normalnej skali ----
 
   // winieta — delikatne przyciemnienie rogów (kinowy sznyt), pod HUD
-  const vig = ctx.createRadialGradient(W/2, H*0.46, H*0.35, W/2, H*0.5, H*0.95);
-  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(10,14,30,0.32)');
-  ctx.fillStyle=vig; ctx.fillRect(-OX,0,VW,H);
+  if(!G.vig){ G.vig = ctx.createRadialGradient(W/2, H*0.46, H*0.35, W/2, H*0.5, H*0.95);
+    G.vig.addColorStop(0,'rgba(0,0,0,0)'); G.vig.addColorStop(1,'rgba(10,14,30,0.32)'); }
+  ctx.fillStyle=G.vig; ctx.fillRect(-OX,0,VW,H);
   // czerwona winieta bólu (gdy Greg oberwie)
   if(dmgVig > 0){
     const rv = ctx.createRadialGradient(W/2, H*0.5, H*0.3, W/2, H*0.5, H*0.85);
