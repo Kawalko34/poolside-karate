@@ -1529,13 +1529,18 @@ function draw(){
     ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.stroke();
     ctx.restore();
   }
-  // dymki punktów
+  // dymki punktów — z animacją pop-in (skalowanie)
   for(const p of popups){
+    const age = 1 - p.life; // 0 przy pojawieniu → 1 przy zniknięciu
+    const pop = age < 0.12 ? age/0.12*1.25 : (age < 0.24 ? 1.25 - (age-0.12)/0.12*0.25 : 1);
+    ctx.save();
     ctx.globalAlpha = Math.min(1, p.life*1.6);
-    ctx.font='bold 17px Arial'; ctx.textAlign='center'; ctx.lineJoin='round';
-    ctx.lineWidth=4; ctx.strokeStyle='rgba(0,0,0,.7)';
-    ctx.strokeText(p.txt, p.x, p.y);
-    ctx.fillStyle=p.color; ctx.fillText(p.txt, p.x, p.y);
+    ctx.translate(p.x, p.y); ctx.scale(pop, pop);
+    ctx.font='800 19px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.textAlign='center'; ctx.lineJoin='round';
+    ctx.lineWidth=4.5; ctx.strokeStyle='rgba(0,0,0,.75)';
+    ctx.strokeText(p.txt, 0, 0);
+    ctx.fillStyle=p.color; ctx.fillText(p.txt, 0, 0);
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
 
