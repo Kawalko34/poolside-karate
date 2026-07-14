@@ -140,16 +140,31 @@ const sndLose  = ()=>{[400,350,300,200].forEach((f,i)=>setTimeout(()=>beep(f,0.2
 
 // ---------- muzyka ----------
 let musicOn = true, musicStep = 0;
-const BASS = [110,110,110,110, 87.3,87.3,87.3,87.3, 98,98,98,98, 110,110,98,87.3];
-const LEAD = [220,0,261.6,293.7, 329.6,0,293.7,261.6, 220,0,196,220, 261.6,0,329.6,0];
+// progresja akordów Am – F – C – G (8 kroków każdy), pełniejsza pętla 32-krokowa
+const CHORDS = [
+  {root:110, tones:[220,261.6,329.6]},   // Am
+  {root:87.3, tones:[174.6,220,261.6]},  // F
+  {root:130.8, tones:[261.6,329.6,392]}, // C
+  {root:98, tones:[196,246.9,293.7]}     // G
+];
+function kick(){ beep(125,0.13,'sine',0.13,-95); beep(60,0.09,'triangle',0.08,-30); }
+function snare(){ beep(1900,0.05,'square',0.028,-400); beep(240,0.06,'sawtooth',0.03,-120); }
+function hat(o){ beep(o?7000:5200,0.02,'square',o?0.016:0.01); }
 setInterval(()=>{
-  if(!musicOn || !AC || state!=='fight' || document.hidden) return;
-  const b = BASS[musicStep % 16], l = LEAD[musicStep % 16];
-  if(b) beep(b, 0.13, 'triangle', 0.045);
-  if(l) beep(l, 0.11, 'square', 0.028);
-  if(musicStep % 4 === 2) beep(5000, 0.02, 'square', 0.012); // hi-hat
+  if(!musicOn || !AC || state!=='fight' || paused || document.hidden) return;
+  const step = musicStep % 32, ch = CHORDS[(musicStep>>3) % 4], beat = step % 4;
+  // bas — root + kwinta w rytmie
+  if(beat===0) beep(ch.root, 0.15, 'triangle', 0.05);
+  else if(beat===2) beep(ch.root*1.5, 0.12, 'triangle', 0.04);
+  // arpeggio melodii
+  const l = ch.tones[(musicStep) % 3] * (step>=16?2:1);
+  if(step % 2 === 0) beep(l, 0.12, 'square', 0.024);
+  // perkusja: stopa four-on-floor, werbel na 2 i 4, hi-hat co krok
+  if(beat===0) kick();
+  if(beat===2) snare();
+  hat(step % 2 === 1);
   musicStep++;
-}, 145);
+}, 150);
 
 // ---------- input ----------
 const keys = {};
