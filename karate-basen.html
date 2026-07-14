@@ -287,7 +287,7 @@ function spawnWave(){
       const t = TYPES[type];
       enemies.push(mkFighter(POOL.x - 40 - i*60, {color:t.color, beltColor:t.belt, hp:t.hp, maxHp:t.hp,
         facing:-1, speed:t.spd[0] + Math.random()*(t.spd[1]-t.spd[0]),
-        dmgPunch:t.dmgP, dmgKick:t.dmgK, scale:t.scale, mass:t.mass, cdBase:t.cd, ranged:!!t.ranged}));
+        dmgPunch:t.dmgP, dmgKick:t.dmgK, scale:t.scale, mass:t.mass, cdBase:t.cd, ranged:!!t.ranged, etype:type}));
     }
   });
   msgT = 2.2;
@@ -989,6 +989,21 @@ function drawStick(f){
     // opaska w kolorze pasa
     if(f.beltColor){ ctx.strokeStyle=f.beltColor; ctx.lineWidth=3*s;
       ctx.beginPath(); ctx.arc(0, headY, headR+0.2*s, Math.PI*1.08, Math.PI*1.92); ctx.stroke(); }
+    // charakterystyczne akcesoria — rozpoznasz typ wroga na pierwszy rzut oka
+    if(f.etype==='szybki'){ // punkowy irokez
+      ctx.fillStyle=f.beltColor||'#09f';
+      for(let i=-2;i<=2;i++){ const bx=i*3*s; ctx.beginPath();
+        ctx.moveTo(bx-2*s, headY-headR+2*s); ctx.lineTo(bx, headY-headR-7*s+Math.abs(i)*1.5*s); ctx.lineTo(bx+2*s, headY-headR+2*s); ctx.closePath(); ctx.fill(); }
+    } else if(f.etype==='gruby'){ // czapka z daszkiem tyłem
+      ctx.fillStyle=f.beltColor||'#960';
+      ctx.beginPath(); ctx.arc(0, headY-headR+3*s, headR*0.95, Math.PI*1.02, Math.PI*1.98); ctx.fill();
+      ctx.fillRect(-headR*0.95, headY-headR+2.5*s, headR*1.9, 3*s);
+      ctx.fillRect(-headR-4*s, headY-headR+3*s, 5*s, 4*s); // daszek z tyłu
+    } else if(f.etype==='miotacz'){ // daszek/wizjer
+      ctx.fillStyle=f.beltColor||'#0aa';
+      ctx.fillRect(-headR, headY-2*s, headR*2, 3.5*s);
+      ctx.beginPath(); ctx.moveTo(headR, headY-1*s); ctx.lineTo(headR+8*s, headY+1*s); ctx.lineTo(headR, headY+2.5*s); ctx.closePath(); ctx.fill();
+    }
   }
 
   // smuga uderzenia (swoosh)
