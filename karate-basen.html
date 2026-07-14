@@ -231,7 +231,13 @@ function mkFighter(x, opts){
 let player, enemies, arek, girl, wave, state, cut, particles, hearts, splashes, msgT, shake, time;
 let score, combo, comboT, hitStop, popups, shocks, items, balls, paused = false;
 let superCharge = 0, flashT = 0, hitFx = [];
-let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1, trail = [];
+let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1, trail = [], confetti = [];
+const CONF_COLS = ['#ff5252','#ffd43b','#7fd4ff','#ff5fa2','#8bc34a','#fff','#b388ff'];
+function spawnConfetti(n){
+  for(let i=0;i<n;i++) confetti.push({x:Math.random()*W, y:-10-Math.random()*40,
+    vx:(Math.random()-0.5)*1.4, vy:1.5+Math.random()*2.5, rot:Math.random()*6.28, vr:(Math.random()-0.5)*0.4,
+    w:4+Math.random()*4, col:CONF_COLS[Math.random()*CONF_COLS.length|0], life:3.5});
+}
 const store = (typeof localStorage !== 'undefined') ? localStorage : {getItem:()=>null, setItem:()=>{}};
 let hiScore = parseInt(store.getItem('karateBasenHi') || '0', 10);
 
@@ -249,7 +255,7 @@ function init(){
   state = 'story'; storyIdx = 0;
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
-  superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = [];
+  superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = []; confetti = [];
   player = mkFighter(140, {color:'#f5f5f5', beltColor:'#111', hp:140, maxHp:140, facing:1, speed:3.15, name:'GREG',
     dmgPunch:14, dmgKick:20});
   girl = {x: POOL.x - 28, y: GROUND, panicT:0, saved:false, runT:0, yOff:0, rot:0, vx:0, vy:0, sunk:false};
@@ -444,6 +450,8 @@ function update(dt){
   dmgVig = Math.max(0, dmgVig - dt*1.8);
   trail.forEach(g=>g.life -= dt);
   trail = trail.filter(g=>g.life>0);
+  confetti.forEach(c=>{ c.x+=c.vx; c.y+=c.vy; c.vy+=0.02; c.rot+=c.vr; c.vx+=Math.sin(time*3+c.y*0.05)*0.05; c.life-=dt; });
+  confetti = confetti.filter(c=>c.life>0 && c.y < H+20);
   // animowany pasek HP: natychmiast spada zielony, biały „ślad" dogania z opóźnieniem
   const hpTarget = player ? Math.max(0, player.hp/player.maxHp) : 1;
   hpShown = hpTarget;
@@ -796,15 +804,17 @@ function updateWin(dt){
     if(cut.t > 2.6){
       cut.phase='yes'; cut.t=0;
       addPopup(girl.x, GROUND - 165, 'YES! 💍❤️', '#ff5fa2');
-      sndWin();
+      sndWin(); spawnConfetti(90); camPunch = Math.max(camPunch, 0.06);
       for(let i=0;i<12;i++) hearts.push({x:(p.x+girl.x)/2 + (Math.random()-0.5)*90, y:GROUND-100-Math.random()*60, life:2+Math.random()*1.5});
     }
   } else if(cut.phase==='yes'){
     p.pose='kneel';
+    if(Math.random() < 0.35) spawnConfetti(3);
     if(Math.random() < 0.12) hearts.push({x:(p.x+girl.x)/2 + (Math.random()-0.5)*100, y:GROUND-110, life:1.5+Math.random()});
     if(cut.t > 2.6){ cut.phase='end'; cut.t=0; }
   } else {
     p.pose='kneel';
+    if(Math.random() < 0.25) spawnConfetti(2);
     if(Math.random() < 0.05) hearts.push({x:(p.x+girl.x)/2 + (Math.random()-0.5)*70, y:GROUND-110, life:1.5+Math.random()});
   }
 }
@@ -1479,6 +1489,14 @@ function draw(){
     ctx.beginPath(); ctx.ellipse(s.x, GROUND, s.r, s.r*0.22, 0, Math.PI, Math.PI*2); ctx.stroke();
     ctx.strokeStyle='rgba(255,255,255,.7)'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.ellipse(s.x, GROUND, s.r*0.7, s.r*0.15, 0, Math.PI, Math.PI*2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // konfetti (feta zaręczynowa)
+  for(const c of confetti){
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot);
+    ctx.globalAlpha = Math.min(1, c.life);
+    ctx.fillStyle=c.col; ctx.fillRect(-c.w/2, -c.w/4, c.w, c.w*0.5);
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
   ctx.font='20px Arial'; ctx.textAlign='center';
