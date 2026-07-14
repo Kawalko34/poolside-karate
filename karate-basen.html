@@ -55,6 +55,23 @@
     flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:20px;gap:14px;}
   #rotate .big{font-size:52px;animation:spin 2s ease-in-out infinite;}
   @keyframes spin{0%,100%{transform:rotate(-90deg)}50%{transform:rotate(0deg)}}
+  /* ekran wyboru trudności */
+  #diffmenu{display:none;position:fixed;inset:0;z-index:30;flex-direction:column;align-items:center;justify-content:center;
+    gap:22px;text-align:center;padding:20px;
+    background:radial-gradient(circle at 50% 30%,rgba(30,40,80,.92),rgba(8,10,24,.96));
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);}
+  .dm-title{font-size:clamp(20px,5vw,34px);font-weight:900;letter-spacing:1px;
+    background:linear-gradient(90deg,#ffd43b,#ff9c00 45%,#ff5fa2);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .dm-btns{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+  .dm{cursor:pointer;width:190px;padding:20px 16px;border-radius:18px;border:2px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.06);color:#fff;display:flex;flex-direction:column;gap:8px;align-items:center;
+    transition:transform .1s ease,background .1s ease,border-color .1s ease;-webkit-tap-highlight-color:transparent;}
+  .dm b{font-size:26px;font-weight:900;letter-spacing:1px;}
+  .dm span{font-size:12.5px;color:#aebbe0;font-weight:500;}
+  .dm:nth-child(1) b{color:#8bc34a;} .dm:nth-child(2) b{color:#ffd43b;} .dm:nth-child(3) b{color:#ff5252;}
+  .dm:hover,.dm:active{transform:translateY(-4px) scale(1.04);background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.5);}
+  .dm-hint{font-size:13px;color:#6b78a6;}
+  @media (max-width:560px){ .dm{width:150px;padding:14px 10px;} .dm b{font-size:21px;} }
 </style>
 </head>
 <body>
@@ -81,6 +98,15 @@
 </div>
 <div id="hint">Greg, save Natalka! Watch out for Mr Arek…</div>
 <div id="rotate"><div class="big">📱</div><div>Rotate your phone<br>to play 🥋</div></div>
+<div id="diffmenu">
+  <div class="dm-title">🥋 CHOOSE YOUR CHALLENGE</div>
+  <div class="dm-btns">
+    <button class="dm" data-d="easy"><b>EASY</b><span>Relaxed poolside brawl</span></button>
+    <button class="dm" data-d="normal"><b>NORMAL</b><span>A fair fight</span></button>
+    <button class="dm" data-d="hard"><b>HARD</b><span>Only for champions</span></button>
+  </div>
+  <div class="dm-hint">tap a card &nbsp;·&nbsp; or press 1 / 2 / 3</div>
+</div>
 <script>
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const W = 960, H = 540;
@@ -177,12 +203,19 @@ function anyKeyAction(){
 }
 addEventListener('keydown', e=>{
   const k = e.key.toLowerCase();
+  // menu wyboru trudności ma pierwszeństwo
+  if(typeof diffMenuEl !== 'undefined' && diffMenuEl.style.display !== 'none' && diffMenuEl.style.display !== ''){
+    if(k==='1') chooseDiff('easy');
+    else if(k==='2') chooseDiff('normal');
+    else if(k==='3') chooseDiff('hard');
+    return;
+  }
   keys[k] = true;
   if(['arrowleft','arrowright','arrowup',' '].includes(k)) e.preventDefault();
   anyKeyAction();
   if(k==='m') musicOn = !musicOn;
   if(k==='p' && state==='fight') paused = !paused;
-  if(k==='r'){ paused = false; init(); }
+  if(k==='r'){ paused = false; showMenu(); }
 });
 addEventListener('keyup', e=>keys[e.key.toLowerCase()] = false);
 
@@ -211,10 +244,18 @@ document.querySelectorAll('.tbtn').forEach(b=>{
   b.addEventListener('pointercancel', off);
   b.addEventListener('pointerleave', off);
 });
-// tap w canvas = start / restart po końcu gry
+// tap w canvas = przewiń fabułę / po końcu gry wróć do wyboru trudności
 cv.addEventListener('pointerdown', ()=>{
   if(state==='story') anyKeyAction();
-  else if((state==='win' && cut && cut.phase==='end') || (state==='lose' && cut && cut.phase==='girlSunk')) init();
+  else if((state==='win' && cut && cut.phase==='end') || (state==='lose' && cut && cut.phase==='girlSunk')) showMenu();
+});
+// ekran wyboru trudności
+const diffMenuEl = document.getElementById('diffmenu');
+function showMenu(){ paused = false; diffMenuEl.style.display = 'flex'; }
+function hideMenu(){ diffMenuEl.style.display = 'none'; }
+function chooseDiff(key){ if(!DIFFS[key]) return; unlockAudio(); diff = DIFFS[key]; hideMenu(); init(); }
+document.querySelectorAll('#diffmenu .dm').forEach(b=>{
+  b.addEventListener('pointerdown', e=>{ e.preventDefault(); chooseDiff(b.dataset.d); });
 });
 // górne przyciski (pauza / muzyka / restart)
 document.querySelectorAll('#topbtns .tbtn').forEach(b=>{
@@ -223,7 +264,7 @@ document.querySelectorAll('#topbtns .tbtn').forEach(b=>{
     const a = b.dataset.act;
     if(a==='pause'){ if(state==='fight') paused = !paused; }
     else if(a==='music'){ musicOn = !musicOn; b.style.opacity = musicOn ? '1' : '0.4'; }
-    else if(a==='restart'){ paused = false; init(); }
+    else if(a==='restart'){ showMenu(); }
   });
 });
 
@@ -271,7 +312,7 @@ function init(){
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
   superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = []; confetti = [];
-  player = mkFighter(140, {color:'#f5f5f5', beltColor:'#111', hp:140, maxHp:140, facing:1, speed:3.15, name:'GREG',
+  player = mkFighter(140, {color:'#f5f5f5', beltColor:'#111', hp:diff.php, maxHp:diff.php, facing:1, speed:3.15, name:'GREG',
     dmgPunch:14, dmgKick:20});
   girl = {x: POOL.x - 28, y: GROUND, panicT:0, saved:false, runT:0, yOff:0, rot:0, vx:0, vy:0, sunk:false};
   wave = 0; enemies = []; arek = null;
@@ -281,6 +322,14 @@ function init(){
   storyCast = { arek: mkFighter(520, {color:'#0a0a0a', beltColor:'#c00', scale:1.75, isArek:true,
     facing:1, name:'MR AREK', pose:'punch', poseT:0.09}) };
 }
+
+// poziomy trudności — mnożniki nakładane na bazowe (EASY) wartości wrogów + HP gracza
+const DIFFS = {
+  easy:   {name:'EASY',   sub:'Relaxed poolside brawl', ehp:1.0,  edmg:1.0, espd:1.0,  php:150, col:'#8bc34a'},
+  normal: {name:'NORMAL', sub:'A fair fight',           ehp:1.35, edmg:1.7, espd:1.12, php:110, col:'#ffd43b'},
+  hard:   {name:'HARD',   sub:'Only for champions',     ehp:1.8,  edmg:2.6, espd:1.28, php:80,  col:'#ff5252'}
+};
+let diff = DIFFS.normal;
 
 const TYPES = {
   zbir:   {color:'#111',    belt:'#333', hp:24, spd:[1.1,1.5],  dmgP:4,  dmgK:6,  scale:1,    mass:1,   cd:2.0},
@@ -301,14 +350,16 @@ function spawnWave(){
   if(!w) return;
   w.mobs.forEach((type, i) => {
     if(type === 'arek'){
-      arek = mkFighter(POOL.x - 60, {color:'#0a0a0a', beltColor:'#c00', scale:1.75, hp:120, maxHp:120,
-        dmgPunch:9, dmgKick:13, speed:1.15, isArek:true, facing:-1, name:'MR AREK', mass:4, specialCd:5.5});
+      arek = mkFighter(POOL.x - 60, {color:'#0a0a0a', beltColor:'#c00', scale:1.75, hp:Math.round(120*diff.ehp), maxHp:Math.round(120*diff.ehp),
+        dmgPunch:Math.round(9*diff.edmg), dmgKick:Math.round(13*diff.edmg), speed:1.15*diff.espd, isArek:true, facing:-1, name:'MR AREK', mass:4, specialCd:5.5});
       enemies.push(arek);
     } else {
       const t = TYPES[type];
-      enemies.push(mkFighter(POOL.x - 40 - i*60, {color:t.color, beltColor:t.belt, hp:t.hp, maxHp:t.hp,
-        facing:-1, speed:t.spd[0] + Math.random()*(t.spd[1]-t.spd[0]),
-        dmgPunch:t.dmgP, dmgKick:t.dmgK, scale:t.scale, mass:t.mass, cdBase:t.cd, ranged:!!t.ranged, etype:type}));
+      const ehp = Math.round(t.hp*diff.ehp);
+      enemies.push(mkFighter(POOL.x - 40 - i*60, {color:t.color, beltColor:t.belt, hp:ehp, maxHp:ehp,
+        facing:-1, speed:(t.spd[0] + Math.random()*(t.spd[1]-t.spd[0]))*diff.espd,
+        dmgPunch:Math.max(1,Math.round(t.dmgP*diff.edmg)), dmgKick:Math.max(1,Math.round(t.dmgK*diff.edmg)),
+        scale:t.scale, mass:t.mass, cdBase:t.cd, ranged:!!t.ranged, etype:type}));
     }
   });
   msgT = 2.2;
@@ -1569,6 +1620,10 @@ function draw(){
   ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.lineWidth=1.2; ctx.stroke();
   ctx.fillStyle='#fff'; ctx.font='700 12.5px '+F; ctx.textAlign='left';
   ctx.fillText('🥋 GREG — THE WHITE WARRIOR', 30, 33);
+  // chip trudności
+  ctx.font='800 10px '+F; const dw = ctx.measureText(diff.name).width + 12;
+  rr(268-dw-2, 20, dw, 15, 7.5); ctx.fillStyle=diff.col; ctx.globalAlpha=0.9; ctx.fill(); ctx.globalAlpha=1;
+  ctx.fillStyle='#0b0e1e'; ctx.textAlign='center'; ctx.fillText(diff.name, 268-2-dw/2, 30.5); ctx.textAlign='left';
   rr(30,41,238,17,8.5); ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fill();
   const hpF = Math.max(0, player.hp/player.maxHp);
   // biały „ślad" obrażeń dogania z opóźnieniem
@@ -1720,6 +1775,7 @@ function drawStoryPanel(){
 }
 
 init();
+showMenu(); // najpierw wybór trudności
 requestAnimationFrame(loop);
 </script>
 </body>
