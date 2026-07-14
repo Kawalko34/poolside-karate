@@ -231,7 +231,7 @@ function mkFighter(x, opts){
 let player, enemies, arek, girl, wave, state, cut, particles, hearts, splashes, msgT, shake, time;
 let score, combo, comboT, hitStop, popups, shocks, items, balls, paused = false;
 let superCharge = 0, flashT = 0, hitFx = [];
-let camPunch = 0, slowmo = 0, dustT = 0;
+let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1;
 const store = (typeof localStorage !== 'undefined') ? localStorage : {getItem:()=>null, setItem:()=>{}};
 let hiScore = parseInt(store.getItem('karateBasenHi') || '0', 10);
 
@@ -249,7 +249,7 @@ function init(){
   state = 'story'; storyIdx = 0;
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
-  superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0;
+  superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1;
   player = mkFighter(140, {color:'#f5f5f5', beltColor:'#111', hp:140, maxHp:140, facing:1, speed:3.15, name:'GREG',
     dmgPunch:14, dmgKick:20});
   girl = {x: POOL.x - 28, y: GROUND, panicT:0, saved:false, runT:0, yOff:0, rot:0, vx:0, vy:0, sunk:false};
@@ -328,6 +328,7 @@ function tryAttack(a, targets, kind){
       if(t === player){
         t.invuln = 0.7;
         combo = 0;
+        dmgVig = 0.6; // czerwona winieta bólu
       } else if(a === player){
         combo++; comboT = 1.4;
         superCharge = Math.min(100, superCharge + (kind==='kick' ? 16 : 12));
@@ -337,6 +338,12 @@ function tryAttack(a, targets, kind){
       if(t.hp <= 0){
         t.dead = true; t.pose='ko';
         if(a === player){ addScore(25, t.x, t.y - 105*t.scale); burst(t.x, t.y-50*t.scale, '#ffd43b', 14); }
+        if(t.isArek && a === player){ // kinowy nokaut bossa — slow-motion + rozbłysk
+          slowmo = 1.4; camPunch = Math.max(camPunch, 0.08); flashT = Math.max(flashT, 0.2);
+          shake = Math.max(shake, 14);
+          hitFx.push({x:t.x, y:t.y-70*t.scale, r:20, life:0.35, big:true});
+          burst(t.x, t.y-60*t.scale, '#fff', 22);
+        }
       }
       // kopniak przy krawędzi = zbir wpada do basenu!
       if(a === player && kind==='kick' && !t.isArek && t.x > POOL.x - 80 && a.facing === 1){
@@ -391,7 +398,7 @@ function shockwave(a){
   burst(a.x + 30, GROUND, '#c9b48b', 10);
   const p = player;
   if(p.onGround && !p.dead && p.invuln <= 0 && Math.abs(p.x - a.x) < 220){
-    p.hp -= 8; p.hurtT = 0.5; p.invuln = 0.8; combo = 0;
+    p.hp -= 8; p.hurtT = 0.5; p.invuln = 0.8; combo = 0; dmgVig = 0.7;
     p.vx = Math.sign(p.x - a.x || 1) * 9; p.vy = -5; p.onGround = false;
     p.pose = 'hit'; p.poseT = 0;
     sndHurt();
@@ -408,7 +415,8 @@ function loop(now){
   if(frame > 0.25) frame = 0.25; // po uśpieniu karty nie przewijaj setek klatek
   if(paused){ draw(); requestAnimationFrame(loop); return; }
   if(hitStop > 0){ hitStop = Math.max(0, hitStop - frame); draw(); requestAnimationFrame(loop); return; }
-  acc += frame;
+  if(slowmo > 0) slowmo = Math.max(0, slowmo - frame); // odliczaj w czasie rzeczywistym
+  acc += frame * (slowmo > 0 ? 0.35 : 1); // slow-motion przy nokaucie bossa
   let steps = 0;
   while(acc >= STEP && steps < 5){ time += STEP; update(STEP); acc -= STEP; steps++; }
   draw();
@@ -433,7 +441,12 @@ function update(dt){
   hitFx.forEach(h=>{h.r += dt*(h.big?280:200); h.life -= dt;});
   hitFx = hitFx.filter(h=>h.life>0);
   camPunch = Math.max(0, camPunch - dt*0.28);
-  if(slowmo > 0) slowmo = Math.max(0, slowmo - dt);
+  dmgVig = Math.max(0, dmgVig - dt*1.8);
+  // animowany pasek HP: natychmiast spada zielony, biały „ślad" dogania z opóźnieniem
+  const hpTarget = player ? Math.max(0, player.hp/player.maxHp) : 1;
+  hpShown = hpTarget;
+  if(hpGhost > hpShown) hpGhost = Math.max(hpShown, hpGhost - dt*0.6);
+  else hpGhost = hpShown;
   if(comboT > 0){ comboT -= dt; if(comboT <= 0) combo = 0; }
   flashT = Math.max(0, flashT - dt);
 
@@ -613,7 +626,7 @@ function updateFight(dt){
         addPopup(p.x, p.y - 112, 'DEFLECTED! 🏐', '#9adcff');
         beep(1500, 0.08, 'square', 0.08);
       } else if(p.invuln <= 0){
-        p.hp -= 5; p.hurtT = 0.4; p.invuln = 0.6; combo = 0;
+        p.hp -= 5; p.hurtT = 0.4; p.invuln = 0.6; combo = 0; dmgVig = 0.55;
         p.pose = 'hit'; p.poseT = 0; p.vx = Math.sign(b.vx) * 4;
         sndHurt(); b.deadBall = true;
       }
@@ -1472,6 +1485,14 @@ function draw(){
   const vig = ctx.createRadialGradient(W/2, H*0.46, H*0.35, W/2, H*0.5, H*0.95);
   vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(10,14,30,0.32)');
   ctx.fillStyle=vig; ctx.fillRect(-OX,0,VW,H);
+  // czerwona winieta bólu (gdy Greg oberwie)
+  if(dmgVig > 0){
+    const rv = ctx.createRadialGradient(W/2, H*0.5, H*0.3, W/2, H*0.5, H*0.85);
+    rv.addColorStop(0,'rgba(255,0,0,0)'); rv.addColorStop(1,'rgba(220,20,20,'+(0.5*dmgVig).toFixed(2)+')');
+    ctx.fillStyle=rv; ctx.fillRect(-OX,0,VW,H);
+  }
+  // przygaszenie przy slow-motion (nokaut bossa)
+  if(slowmo > 0){ ctx.fillStyle='rgba(20,10,40,'+(0.18*Math.min(1,slowmo)).toFixed(2)+')'; ctx.fillRect(-OX,0,VW,H); }
 
   // błysk super-ciosu
   if(flashT>0){ ctx.fillStyle='rgba(255,255,240,'+Math.min(0.65,flashT*2.2).toFixed(2)+')'; ctx.fillRect(-OX,0,VW,H); }
@@ -1485,6 +1506,11 @@ function draw(){
   ctx.fillText('🥋 GREG — THE WHITE WARRIOR', 30, 33);
   rr(30,41,238,17,8.5); ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fill();
   const hpF = Math.max(0, player.hp/player.maxHp);
+  // biały „ślad" obrażeń dogania z opóźnieniem
+  if(hpGhost > hpF + 0.001){
+    rr(30,41,Math.max(14,238*hpGhost),17,8.5);
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fill();
+  }
   if(hpF>0){
     rr(30,41,Math.max(14,238*hpF),17,8.5);
     const hg=ctx.createLinearGradient(30,0,268,0);
