@@ -231,7 +231,7 @@ function mkFighter(x, opts){
 let player, enemies, arek, girl, wave, state, cut, particles, hearts, splashes, msgT, shake, time;
 let score, combo, comboT, hitStop, popups, shocks, items, balls, paused = false;
 let superCharge = 0, flashT = 0, hitFx = [];
-let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1;
+let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1, trail = [];
 const store = (typeof localStorage !== 'undefined') ? localStorage : {getItem:()=>null, setItem:()=>{}};
 let hiScore = parseInt(store.getItem('karateBasenHi') || '0', 10);
 
@@ -249,7 +249,7 @@ function init(){
   state = 'story'; storyIdx = 0;
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
-  superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1;
+  superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = [];
   player = mkFighter(140, {color:'#f5f5f5', beltColor:'#111', hp:140, maxHp:140, facing:1, speed:3.15, name:'GREG',
     dmgPunch:14, dmgKick:20});
   girl = {x: POOL.x - 28, y: GROUND, panicT:0, saved:false, runT:0, yOff:0, rot:0, vx:0, vy:0, sunk:false};
@@ -442,6 +442,8 @@ function update(dt){
   hitFx = hitFx.filter(h=>h.life>0);
   camPunch = Math.max(0, camPunch - dt*0.28);
   dmgVig = Math.max(0, dmgVig - dt*1.8);
+  trail.forEach(g=>g.life -= dt);
+  trail = trail.filter(g=>g.life>0);
   // animowany pasek HP: natychmiast spada zielony, biały „ślad" dogania z opóźnieniem
   const hpTarget = player ? Math.max(0, player.hp/player.maxHp) : 1;
   hpShown = hpTarget;
@@ -509,6 +511,9 @@ function updateFight(dt){
   if(moving && (p.pose==='idle'||p.pose==='walk')){ p.pose='walk'; p.walkT += dt*11; }
   else if(!moving && p.pose==='walk'){ if(Math.abs(p.moveVx) < 0.5) p.pose='idle'; else p.walkT += dt*11; }
   physics(p, dt);
+  // smugi ruchu (afterimages) — przy super, aktywnym kopnięciu lub szybkim biegu
+  const trailing = flashT>0.05 || (p.pose==='kick' && p.poseT<0.22) || Math.abs(p.moveVx)>2.7;
+  if(trailing){ trail.push(Object.assign({}, p, {isGreg:true, ghost:true, name:'', life:0.2})); if(trail.length>10) trail.shift(); }
 
   // enemies AI
   for(const e of enemies){
@@ -810,7 +815,7 @@ function drawStick(f){
   ctx.save();
   if(f===player && f.invuln > 0 && Math.floor(time*24)%2===0) ctx.globalAlpha = 0.45;
   // cień na ziemi (mniejszy, gdy postać wysoko w skoku)
-  if(!f.pooled && !f.pooledSunk){
+  if(!f.pooled && !f.pooledSunk && !f.ghost){
     const air = Math.max(0, GROUND - f.y);
     const sc = Math.max(0.35, 1 - air/240);
     ctx.save();
@@ -871,7 +876,7 @@ function drawStick(f){
   if(bob) ctx.translate(0, -bob);
 
   // ===== renderowanie ciała (wypełnione sylwetki) =====
-  const gi = (f===player);
+  const gi = (f===player || f.isGreg);
   const hurtFlash = f.hurtT>0 && Math.floor(time*20)%2===0;
   const bodyCol  = hurtFlash ? '#ff6b6b' : f.color;
   const limbCol  = gi ? (hurtFlash?'#ffc4c4':'#e9e9e9') : bodyCol;
@@ -1023,7 +1028,7 @@ function drawStick(f){
   ctx.restore();
 
   // pasek HP nad głową (w walce)
-  if(state==='fight' && !f.dead && f!==player){
+  if(state==='fight' && !f.dead && f!==player && !f.ghost){
     const bw = 40*f.scale;
     ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(f.x-bw/2, f.y-100*f.scale, bw, 5);
     ctx.fillStyle = f.isArek ? '#e11' : '#ff9800';
@@ -1417,7 +1422,14 @@ function draw(){
     ctx.beginPath(); ctx.moveTo(player.x-10, player.y-3); ctx.lineTo(player.x+10, player.y-3); ctx.stroke();
     ctx.restore();
     nameTag('GREG', player.x, POOL.top - 12, '#fff');
-  } else drawStick(player);
+  } else {
+    // afterimages (smugi ruchu) — świetliste duchy za Gregiem
+    for(const g of trail){
+      ctx.save(); ctx.globalAlpha = Math.max(0, g.life/0.2) * 0.32;
+      drawStick(g); ctx.restore();
+    }
+    drawStick(player);
+  }
 
   // dymki oświadczyn po zwycięstwie
   if(state==='win' && cut && ['kneel','yes','end'].includes(cut.phase)){
