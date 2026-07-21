@@ -76,7 +76,7 @@
 </head>
 <body>
 <h1>🥋 POOLSIDE KARATE 🏊‍♀️</h1>
-<div id="info"><b>←/→</b> or <b>A/D</b> — move &nbsp;·&nbsp; <b>W/↑</b> — jump &nbsp;·&nbsp; <b>J</b> — punch 👊 &nbsp;·&nbsp; <b>K</b> — kick 🦵 &nbsp;·&nbsp; <b>S</b> — block 🛡️ &nbsp;·&nbsp; <b>L</b> — super ⚡ &nbsp;·&nbsp; <b>M</b> — music &nbsp;·&nbsp; <b>P</b> — pause &nbsp;·&nbsp; <b>R</b> — restart</div>
+<div id="info"><b>←/→</b> or <b>A/D</b> — move &nbsp;·&nbsp; <b>W/↑</b> — jump &nbsp;·&nbsp; <b>J</b> — punch 👊 &nbsp;·&nbsp; <b>K</b> — kick 🦵 &nbsp;·&nbsp; <b>F</b> — water blaster 💦 &nbsp;·&nbsp; <b>S</b> — block 🛡️ &nbsp;·&nbsp; <b>L</b> — super ⚡ &nbsp;·&nbsp; <b>M</b> — music &nbsp;·&nbsp; <b>P</b> — pause &nbsp;·&nbsp; <b>R</b> — restart</div>
 <canvas id="c" width="960" height="540"></canvas>
 <div id="topbtns">
   <div class="tbtn" data-act="pause">⏸</div>
@@ -91,6 +91,7 @@
   </div>
   <div class="tgroup">
     <div class="tbtn" data-k="s">🛡️</div>
+    <div class="tbtn" data-k="f">💦</div>
     <div class="tbtn" data-k="j">👊</div>
     <div class="tbtn" data-k="k">🦵</div>
     <div class="tbtn" data-k="l">⚡</div>
@@ -251,8 +252,8 @@ cv.addEventListener('pointerdown', ()=>{
 });
 // ekran wyboru trudności
 const diffMenuEl = document.getElementById('diffmenu');
-function showMenu(){ paused = false; diffMenuEl.style.display = 'flex'; }
-function hideMenu(){ diffMenuEl.style.display = 'none'; }
+function showMenu(){ paused = false; menuOpen = true; diffMenuEl.style.display = 'flex'; }
+function hideMenu(){ menuOpen = false; diffMenuEl.style.display = 'none'; }
 function chooseDiff(key){ if(!DIFFS[key]) return; unlockAudio(); diff = DIFFS[key]; hideMenu(); init(); }
 document.querySelectorAll('#diffmenu .dm').forEach(b=>{
   b.addEventListener('pointerdown', e=>{ e.preventDefault(); chooseDiff(b.dataset.d); });
@@ -269,7 +270,7 @@ document.querySelectorAll('#topbtns .tbtn').forEach(b=>{
 });
 
 // ---------- fighters ----------
-const CHAR_SCALE = 1.42; // większe, bardziej widoczne postacie
+const CHAR_SCALE = 1.12; // naturalny rozmiar postaci (nie za duże)
 function mkFighter(x, opts){
   const f = Object.assign({
     x, y: GROUND, vx:0, vy:0, onGround:true,
@@ -287,7 +288,8 @@ function mkFighter(x, opts){
 let player, enemies, arek, girl, wave, state, cut, particles, hearts, splashes, msgT, shake, time;
 let score, combo, comboT, hitStop, popups, shocks, items, balls, paused = false;
 let superCharge = 0, flashT = 0, hitFx = [];
-let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1, trail = [], confetti = [];
+let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1, trail = [], confetti = [], menuOpen = false;
+let waterShots = [], waterCd = 0;
 const CONF_COLS = ['#ff5252','#ffd43b','#7fd4ff','#ff5fa2','#8bc34a','#fff','#b388ff'];
 function spawnConfetti(n){
   for(let i=0;i<n;i++) confetti.push({x:Math.random()*W, y:-10-Math.random()*40,
@@ -312,6 +314,7 @@ function init(){
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
   superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = []; confetti = [];
+  waterShots = []; waterCd = 0;
   player = mkFighter(140, {color:'#f5f5f5', beltColor:'#111', hp:diff.php, maxHp:diff.php, facing:1, speed:3.15, name:'GREG',
     dmgPunch:14, dmgKick:20});
   girl = {x: POOL.x - 28, y: GROUND, panicT:0, saved:false, runT:0, yOff:0, rot:0, vx:0, vy:0, sunk:false};
@@ -433,6 +436,19 @@ function tryAttack(a, targets, kind){
 
 function burst(x,y,color,n){
   for(let i=0;i<n;i++) particles.push({x,y,vx:(Math.random()-0.5)*6,vy:-Math.random()*5,life:0.6,color});
+}
+
+function fireWater(p){
+  waterCd = 0.28;
+  p.pose = 'shoot'; p.poseT = 0;
+  p.moveVx -= p.facing * 1.2; // lekki odrzut
+  const mx = p.x + p.facing*30*p.scale, my = p.y - 58*p.scale;
+  for(let i=0;i<3;i++)
+    waterShots.push({x:mx, y:my+(i-1)*3, vx:p.facing*(11+Math.random()*1.5), vy:(Math.random()-0.5)*1.2 - 0.4, life:0.85, r:5+Math.random()*2});
+  // rozprysk z lufy
+  for(let i=0;i<5;i++) particles.push({x:mx,y:my,vx:p.facing*(2+Math.random()*3),vy:(Math.random()-0.5)*2,life:0.25,color:'rgba(150,220,255,0.9)'});
+  beep(880, 0.05, 'sine', 0.05, 400); beep(300, 0.08, 'sawtooth', 0.04, -150);
+  camPunch = Math.max(camPunch, 0.02);
 }
 
 function doSuper(){
@@ -566,7 +582,9 @@ function updateFight(dt){
     if((keys['arrowup']||keys['w']||keys[' ']) && p.onGround){ p.vy=-10.6; p.onGround=false; p.squash=-0.18; }
     if(keys['j'] && p.attackCd<=0){ p.pose='punch'; p.poseT=0; p.attackCd=0.32; p.vx = p.facing*3.2; tryAttack(p, enemies, 'punch'); }
     else if(keys['k'] && p.attackCd<=0){ p.pose='kick'; p.poseT=0; p.attackCd=0.55; p.vx = p.facing*4.2; tryAttack(p, enemies, 'kick'); }
+    else if(keys['f'] && waterCd<=0 && p.attackCd<=0){ fireWater(p); }
   }
+  waterCd = Math.max(0, waterCd - dt);
   if(keys['l']){ keys['l'] = false; doSuper(); }
   // płynne przyspieszanie/hamowanie zamiast skokowej prędkości
   const accel = targetVx !== 0 ? 0.22 : 0.30;
@@ -581,6 +599,7 @@ function updateFight(dt){
   }
   if(p.pose==='punch'&&p.poseT>0.24) p.pose='idle';
   if(p.pose==='kick'&&p.poseT>0.31) p.pose='idle';
+  if(p.pose==='shoot'&&p.poseT>0.22) p.pose='idle';
   if(p.pose==='hit'&&p.poseT>0.3) p.pose='idle';
   if(moving && (p.pose==='idle'||p.pose==='walk')){ p.pose='walk'; p.walkT += dt*11; }
   else if(!moving && p.pose==='walk'){ if(Math.abs(p.moveVx) < 0.5) p.pose='idle'; else p.walkT += dt*11; }
@@ -728,6 +747,31 @@ function updateFight(dt){
     if(b.x < -20 || b.x > W + 20 || b.bounces >= 3) b.deadBall = true;
   }
   balls = balls.filter(b=>!b.deadBall);
+
+  // pociski wody z blastera Grega
+  for(const s of waterShots){
+    s.x += s.vx; s.y += s.vy; s.vy += 0.12; s.life -= dt;
+    // ślad kropelek
+    if(Math.random()<0.6) particles.push({x:s.x,y:s.y,vx:-s.vx*0.05,vy:0.4,life:0.3,color:'rgba(140,215,255,0.8)'});
+    for(const e of enemies){
+      if(e.dead || e.pooled) continue;
+      if(Math.abs(s.x - e.x) < 26*e.scale && s.y > e.y - 92*e.scale && s.y < e.y - 8){
+        e.hp -= 7; e.hurtT = 0.28; e.pose='hit'; e.poseT=0;
+        e.vx = Math.sign(s.vx||1) * 4.5 / (e.mass||1); // silne odepchnięcie
+        addScore(8, e.x, e.y - 95*e.scale);
+        for(let i=0;i<7;i++) splashes.push({x:s.x,y:s.y,vx:(Math.random()-0.5)*4,vy:-Math.random()*3,life:0.5});
+        beep(600,0.05,'sine',0.04,-200);
+        // przy krawędzi — wodny strzał spycha do basenu!
+        if(!e.isArek && e.x > POOL.x - 70 && s.vx > 0){
+          e.pooled = true; e.dead = true; e.hp = 0; e.onGround=false; e.vx=4.5; e.vy=-4;
+          addScore(50, e.x, e.y - 120*e.scale); addPopup(e.x, e.y - 140*e.scale, 'SPLASH! 🌊', '#7fd4ff');
+        } else if(e.hp <= 0){ e.dead = true; e.pose='ko'; addScore(20, e.x, e.y-105*e.scale); }
+        s.life = 0; break;
+      }
+    }
+    if(s.x < -30 || s.x > W+30) s.life = 0;
+  }
+  waterShots = waterShots.filter(s=>s.life>0);
 
   // hot-dogi leczące
   for(const it of items){
@@ -948,6 +992,10 @@ function drawStick(f){
     armF={a:2.7,b:2.9}; armB={a:2.5,b:2.8};
     if(!f.onGround){ legF={a:0.9,b:1.1}; legB={a:0.5,b:1.0}; }
     lean = 0.12; bob = 0; }
+  if(f.pose==='shoot'){ // wyciągnięty blaster + odrzut
+    const rk = Math.max(0, 1-t/0.18);
+    armF={ext:0.92 - rk*0.12}; armB={a:0.55,b:2.1}; lean = -0.05 - rk*0.05; bob = 0;
+    legF={a:0.28,b:0.2}; legB={a:-0.3,b:0.2}; }
   if(lean) ctx.rotate(lean);
   if(bob) ctx.translate(0, -bob);
 
@@ -1103,6 +1151,32 @@ function drawStick(f){
     ctx.fillStyle='rgba(255,255,255,.5)';
     ctx.beginPath(); ctx.arc(handF.hx+4*s,handF.hy,3*s,0,Math.PI*2); ctx.fill();
   }
+  // WODNY BLASTER Grega (super soaker) — trzymany w przedniej ręce
+  if(gi && f.pose!=='kneel' && f.pose!=='slam'){
+    ctx.save(); ctx.translate(handF.hx, handF.hy);
+    const aim = f.pose==='shoot' ? -0.05 : 0.15; ctx.rotate(aim);
+    const u = s;
+    // korpus
+    ctx.fillStyle='#12b5e6'; rr(-3*u,-3.2*u,17*u,7*u,2.5*u); ctx.fill();
+    ctx.fillStyle='#0a90bd'; rr(-3*u,0.4*u,17*u,3.4*u,2*u); ctx.fill();
+    // zbiornik na wodę u góry
+    ctx.fillStyle='rgba(120,220,255,0.85)'; rr(1*u,-8.5*u,10*u,5.5*u,2.2*u); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.5)'; rr(2.5*u,-8*u,4*u,2*u,1*u); ctx.fill();
+    // dysza
+    ctx.fillStyle='#ffb703'; rr(13*u,-1.6*u,6*u,3.4*u,1.2*u); ctx.fill();
+    ctx.fillStyle='#0a3f52'; ctx.beginPath(); ctx.arc(19*u,0.1*u,1.7*u,0,Math.PI*2); ctx.fill();
+    // rączka + spust
+    ctx.fillStyle='#ff7043'; rr(-1*u,2.6*u,4.5*u,6*u,1.5*u); ctx.fill();
+    // obrys
+    ctx.strokeStyle='rgba(0,40,60,0.35)'; ctx.lineWidth=1*u;
+    rr(-3*u,-3.2*u,17*u,7*u,2.5*u); ctx.stroke();
+    if(f.pose==='shoot'){ // rozbłysk z lufy
+      const mk = Math.max(0,1-f.poseT/0.16);
+      ctx.fillStyle='rgba(180,235,255,'+(0.8*mk).toFixed(2)+')';
+      ctx.beginPath(); ctx.arc(21*u,0.1*u,(2+mk*3)*u,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
   if(f.pose==='kneel' && f===player){ // pierścionek zaręczynowy 💍
     ctx.strokeStyle='#ffd700'; ctx.lineWidth=2.4*s;
     ctx.beginPath(); ctx.arc(handF.hx+2*s, handF.hy-7*s, 4*s, 0, Math.PI*2); ctx.stroke();
@@ -1203,7 +1277,7 @@ function drawGirl(){
   if(g.rot) ctx.rotate(g.rot);
   const panic = state==='fight' ? Math.sin(g.panicT*6)*2 : 0;
   ctx.translate(panic, hopNow ? -Math.abs(Math.sin(g.panicT*7))*(cheer?8:12) : 0);
-  const s = 1.4;
+  const s = 1.12;
   ctx.lineCap='round'; ctx.lineJoin='round';
   const headY=-74*s, headR=9.5*s;
   const skin='#ffd9b3';
@@ -1586,6 +1660,16 @@ function draw(){
     });
     ctx.strokeStyle='rgba(0,0,0,.3)'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  // pociski wody (rozciągnięte krople z jasnym rdzeniem)
+  for(const s of waterShots){
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
+    const grd = ctx.createLinearGradient(-s.r*2,0,s.r,0);
+    grd.addColorStop(0,'rgba(120,200,255,0)'); grd.addColorStop(1,'rgba(90,200,255,0.9)');
+    ctx.fillStyle=grd; ctx.beginPath(); ctx.ellipse(0,0,s.r*2.2,s.r*0.7,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#bfeaff'; ctx.beginPath(); ctx.ellipse(s.r*0.4,0,s.r*0.9,s.r*0.55,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s.r*0.6,-s.r*0.15,s.r*0.3,0,Math.PI*2); ctx.fill();
     ctx.restore();
   }
   // dymki punktów — z animacją pop-in (skalowanie)
