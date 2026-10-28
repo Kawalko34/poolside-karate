@@ -31,6 +31,8 @@
     box-shadow:0 4px 16px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.18);
     user-select:none;-webkit-user-select:none;touch-action:none;transition:transform .08s ease,background .08s ease;}
   .tbtn:active{background:rgba(255,255,255,.34);transform:scale(.9);}
+  .tbtn-gas{width:78px;height:78px;font-size:30px;background:rgba(150,180,90,.42);border-color:rgba(214,230,150,.6);}
+  body.touchmode #touch .tbtn-gas{width:70px;height:70px;font-size:30px;}
   body.touchmode #touch{display:flex;}
   body.touchmode #info{display:none;}
   #topbtns{display:none;position:fixed;top:calc(6px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));z-index:11;gap:8px;}
@@ -76,7 +78,8 @@
 </head>
 <body>
 <h1>🥋 POOLSIDE KARATE 🏊‍♀️</h1>
-<div id="info"><b>←/→</b> or <b>A/D</b> — move &nbsp;·&nbsp; <b>W/↑</b> — jump &nbsp;·&nbsp; <b>J</b> — punch 👊 &nbsp;·&nbsp; <b>K</b> — kick 🦵 &nbsp;·&nbsp; <b>F</b> — water blaster 💦 &nbsp;·&nbsp; <b>S</b> — block 🛡️ &nbsp;·&nbsp; <b>L</b> — super ⚡ &nbsp;·&nbsp; <b>M</b> — music &nbsp;·&nbsp; <b>P</b> — pause &nbsp;·&nbsp; <b>R</b> — restart</div>
+<div id="info"><b>←/→</b> ruch &nbsp;·&nbsp; <b>W/↑</b> skok &nbsp;·&nbsp; <b>J / spacja</b> gaz łzawiący 💨 &nbsp;·&nbsp; <b>S</b> blok 🛡️ &nbsp;·&nbsp; <b>M</b> muzyka &nbsp;·&nbsp; <b>P</b> pauza &nbsp;·&nbsp; <b>R</b> restart<br>
+Jesteś <b>Gregiem w stroju cheerleaderki</b> 💙 — gazuj barana za baranem i <b>uwolnij Natalkę</b>!</div>
 <canvas id="c" width="960" height="540"></canvas>
 <div id="topbtns">
   <div class="tbtn" data-act="pause">⏸</div>
@@ -91,13 +94,10 @@
   </div>
   <div class="tgroup">
     <div class="tbtn" data-k="s">🛡️</div>
-    <div class="tbtn" data-k="f">💦</div>
-    <div class="tbtn" data-k="j">👊</div>
-    <div class="tbtn" data-k="k">🦵</div>
-    <div class="tbtn" data-k="l">⚡</div>
+    <div class="tbtn tbtn-gas" data-k="j">💨</div>
   </div>
 </div>
-<div id="hint">Adam, save Margaret! Watch out for Mr Arek…</div>
+<div id="hint">Greg, save Natalka! 8 waves, 4 weapons lying on the deck — walk over one to grab it. Watch out for Mr Arek… and for Pani Gosia.</div>
 <div id="rotate"><div class="big">📱</div><div>Rotate your phone<br>to play 🥋</div></div>
 <div id="diffmenu">
   <div class="dm-title">🥋 CHOOSE YOUR CHALLENGE</div>
@@ -128,14 +128,21 @@ function fitViewport(){
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 const GROUND = 470;
-const POOL = {x: 700, w: 260, top: GROUND - 6, depth: 60};
+// cały kurort w jednej, długiej planszy — Greg idzie z promenady aż nad basen
+const WORLD_W = 5700;
+const POOL = {x: 5340, w: 300, top: GROUND - 6, depth: 60};
+const WORLD_MIN_X = 40;
+const WORLD_MAX_X = POOL.x - 15;
+let camX = 0;
 
 // fabuła + tryb dotykowy (deklaracje wcześnie — używane w kodzie startowym)
 let storyIdx = 0, storyLast = 0, storyCast = null, touchUI = false;
 const STORY = [
-  {t:'POOLSIDE KARATE',  s:'A quiet, sunny afternoon at the Palm Cove pool. Margaret is enjoying the sunshine with a good book…'},
-  {t:'TROUBLE ARRIVES',  s:'Mr Arek and his gang storm the deck. “Throw the girl in the pool, boys. NOBODY reads at MY pool.”'},
-  {t:'ONE HERO STANDS',  s:'Adam — the white warrior — steps out of the shade. “Pick on someone your own size.” FIGHT!'}
+  {t:'POOLSIDE KARATE',  s:'A hot afternoon at Palm Cove. Greg is walking the length of the resort with a ring in his pocket and one plan: ask Natalka by the water, at the deep end, before sunset.'},
+  {t:'THE HOUSE RULES',  s:'Pani Gosia runs Palm Cove. One rule, printed on every sign: ABSOLUTELY NO FIGHTING. She patrols with a whistle, a clipboard — and an electric fly swatter.'},
+  {t:'THEY TAKE THE RESORT', s:'Mr Arek’s crew sweep in and take the place — boardwalk, bar, cabins, the lot. They corner Natalka at the deep end. “Nobody reads at MY pool.”'},
+  {t:'ONE HERO STANDS',  s:'Greg is at the far gate. Eight places between him and her. He could go and find a lifeguard. He rolls up his sleeves instead.'},
+  {t:'FIGHT YOUR WAY EAST', s:'Walk right. Clear each place to open the way. Take what the deck gives you — noodles, umbrellas, flip-flops, ice buckets — and every coin the crew drops. Pani Gosia is listening.'}
 ];
 
 // ---------- audio ----------
@@ -248,7 +255,7 @@ document.querySelectorAll('.tbtn').forEach(b=>{
 // tap w canvas = przewiń fabułę / po końcu gry wróć do wyboru trudności
 cv.addEventListener('pointerdown', ()=>{
   if(state==='story') anyKeyAction();
-  else if((state==='win' && cut && cut.phase==='end') || (state==='lose' && cut && cut.phase==='girlSunk')) showMenu();
+  else if((state==='win' && cut && cut.phase==='end') || (state==='lose' && cut && ['girlSunk','gloat'].includes(cut.phase))) showMenu();
 });
 // ekran wyboru trudności
 const diffMenuEl = document.getElementById('diffmenu');
@@ -279,20 +286,29 @@ function mkFighter(x, opts){
     pose:'idle', poseT:0, attackCd:0, hurtT:0, dead:false, invuln:0, blocking:false, ranged:false,
     walkT:0, rot:0, carried:false, isArek:false, name:'', pooled:false, pooledSunk:false,
     mass:1, cdBase:1.3, specialCd:0, slamAir:false, squash:0, moveVx:0,
+    weapon:null, wUses:0, frozen:0,
+    role:'waiter', side:0, strafeT:0, strafeDir: Math.random()<0.5 ? -1 : 1,
+    chain:0, chainKind:'', chainT:0, knockT:0, spec:null, specT:0, tellT:0, specHit:false,
     koT:0, stopOff: Math.random()*10
   }, opts);
   f.scale *= CHAR_SCALE;
   return f;
 }
 
-let player, enemies, arek, girl, wave, state, cut, particles, hearts, splashes, msgT, shake, time;
+let player, enemies, arek, girl, gosia, wave, state, cut, particles, hearts, splashes, msgT, shake, time;
 let score, combo, comboT, hitStop, popups, shocks, items, balls, paused = false;
 let superCharge = 0, flashT = 0, hitFx = [];
 let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1, trail = [], confetti = [], menuOpen = false;
 let waterShots = [], waterCd = 0;
+let gasClouds = [], gasCd = 0, gasPuffs = [];
+let areaPhase = 'travel', banner = null, bannerT = 0, goArrowT = 0, coins = 0;
+let spawnQueue = [], spawnT = 0, roleT = 0, wfx = [], kioskNear = null, kioskMsgT = 0, kioskMsg = '', kioskCd = 0;
+let fightT = 0; // gdy walka się przeciąga, wszyscy ruszają na gracza — zabezpieczenie przed zablokowaniem
+let viewL = 0, viewR = W; // widoczny wycinek świata — do parallaxu i odsiewania dekoracji
 const CONF_COLS = ['#ff5252','#ffd43b','#7fd4ff','#ff5fa2','#8bc34a','#fff','#b388ff'];
 function spawnConfetti(n){
-  for(let i=0;i<n;i++) confetti.push({x:Math.random()*W, y:-10-Math.random()*40,
+  const cx0 = (player ? player.x : W/2) - W/2;   // sypie się nad graczem, nie na początku planszy
+  for(let i=0;i<n;i++) confetti.push({x:cx0 + Math.random()*W, y:-10-Math.random()*40,
     vx:(Math.random()-0.5)*1.4, vy:1.5+Math.random()*2.5, rot:Math.random()*6.28, vr:(Math.random()-0.5)*0.4,
     w:4+Math.random()*4, col:CONF_COLS[Math.random()*CONF_COLS.length|0], life:3.5});
 }
@@ -314,16 +330,33 @@ function init(){
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
   superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = []; confetti = [];
-  waterShots = []; waterCd = 0;
-  player = mkFighter(140, {color:'#f5f5f5', beltColor:'#111', hp:diff.php, maxHp:diff.php, facing:1, speed:3.15, name:'ADAM',
-    dmgPunch:14, dmgKick:20});
+  waterShots = []; waterCd = 0; gasClouds = []; gasCd = 0; gasPuffs = [];
+  player = mkFighter(90, {color:'#f5f5f5', beltColor:'#111', hp:diff.php, maxHp:diff.php, facing:1, speed:3.15, name:'GREG',
+    dmgPunch:14, dmgKick:20, cheer:true});
   girl = {x: POOL.x - 28, y: GROUND, panicT:0, saved:false, runT:0, yOff:0, rot:0, vx:0, vy:0, sunk:false};
   wave = 0; enemies = []; arek = null;
+  areaPhase = 'travel'; bannerT = 0; banner = null; goArrowT = 0;
+  spawnQueue = []; spawnT = 0; roleT = 0; wfx = [];
+  kioskNear = null; kioskMsgT = 0; kioskCd = 0;
+  camX = 0; coins = 0;
+  items = LOOT.map(l => ({kind:l.k, w:l.w, x:l.x, t:Math.random()*3, taken:false}));
+  gosia = mkGosia(300);
   cut = null; msgT = 0;
-  spawnWave();
-  // obsada do plansz fabularnych
-  storyCast = { arek: mkFighter(520, {color:'#0a0a0a', beltColor:'#c00', scale:1.75, isArek:true,
-    facing:1, name:'MR AREK', pose:'punch', poseT:0.09}) };
+  // obsada do plansz fabularnych (rysowana w stałych miejscach ekranu, nie w świecie)
+  storyCast = {
+    playerX: 170, girlX: 780,
+    arek: mkFighter(560, {color:'#0a0a0a', beltColor:'#c00', scale:1.75, isArek:true,
+      facing:1, name:'MR AREK', pose:'punch', poseT:0.09}),
+    mobs: [
+      mkFighter(660, {color:'#111', beltColor:'#333', facing:1, etype:'zbir'}),
+      mkFighter(716, {color:'#26323e', beltColor:'#09f', scale:0.88, facing:1, etype:'szybki'})
+    ]
+  };
+}
+
+// ---------- PANI GOSIA — kierowniczka basenu z elektryczną packą ----------
+function mkGosia(x){
+  return {x, y:GROUND, t:0, pose:'idle', walkT:0, facing:1, zapT:0, kickT:0, blow:0, shown:false};
 }
 
 // poziomy trudności — mnożniki nakładane na bazowe (EASY) wartości wrogów + HP gracza
@@ -335,45 +368,183 @@ const DIFFS = {
 let diff = DIFFS.normal;
 
 const TYPES = {
-  zbir:   {color:'#111',    belt:'#333', hp:24, spd:[1.1,1.5],  dmgP:4,  dmgK:6,  scale:1,    mass:1,   cd:2.0},
-  szybki: {color:'#26323e', belt:'#09f', hp:16, spd:[1.9,2.3],  dmgP:3,  dmgK:5,  scale:0.88, mass:0.8, cd:1.4},
-  gruby:  {color:'#000',    belt:'#960', hp:52, spd:[0.75,0.9], dmgP:8,  dmgK:11, scale:1.32, mass:2.3, cd:2.4},
-  miotacz:{color:'#173a3a', belt:'#0aa', hp:18, spd:[1.4,1.7],  dmgP:3,  dmgK:5,  scale:0.95, mass:0.9, cd:3.0, ranged:true}
+  zbir:      {color:'#111',    belt:'#333', hp:24, spd:[1.1,1.5],  dmgP:4,  dmgK:6,  scale:1,    mass:1,   cd:2.0},
+  szybki:    {color:'#26323e', belt:'#09f', hp:16, spd:[1.9,2.3],  dmgP:3,  dmgK:5,  scale:0.88, mass:0.8, cd:1.4},
+  gruby:     {color:'#000',    belt:'#960', hp:52, spd:[0.75,0.9], dmgP:8,  dmgK:11, scale:1.32, mass:2.3, cd:2.4},
+  miotacz:   {color:'#173a3a', belt:'#0aa', hp:18, spd:[1.4,1.7],  dmgP:3,  dmgK:5,  scale:0.95, mass:0.9, cd:3.0, ranged:true},
+  ratownik:  {color:'#7a1f1f', belt:'#ff5252', hp:34, spd:[1.7,2.0], dmgP:6, dmgK:9, scale:1.06, mass:1.2, cd:1.6},
+  ochroniarz:{color:'#050510', belt:'#7fd4ff', hp:70, spd:[0.95,1.15], dmgP:10, dmgK:14, scale:1.42, mass:3.2, cd:2.2}
 };
 
-const WAVES = [
-  {label:'WAVE 1',            q:'“Get lost, hero!”',                mobs:['zbir','zbir']},
-  {label:'WAVE 2',            q:'“He’s tougher than he looks…”',   mobs:['zbir','szybki','zbir']},
-  {label:'WAVE 3',            q:'“STOP HIM. NOW!”',                 mobs:['gruby','miotacz','szybki']},
-  {label:'BOSS: MR AREK 💀',  q:'“My pool. Your funeral, Adam.”',   mobs:['arek','miotacz']}
+// ---------- broń walająca się po decku ----------
+const WEAPONS = {
+  noodle:  {name:'POOL NOODLE',    icon:'🌈', uses:26, range:1.85, dmg:1.35, knock:2.3, col:'#ff5fa2',
+            tip:'huge reach — sweep them into the pool'},
+  umbrella:{name:'BEACH UMBRELLA', icon:'⛱️', uses:18, range:1.55, dmg:1.8,  knock:1.4, col:'#ff9c00',
+            tip:'heavy swing — hits the whole row'},
+  flipflop:{name:'FLIP-FLOP',      icon:'🩴', uses:16, range:1.15, dmg:1.15, knock:1.0, col:'#8bc34a', toss:true,
+            tip:'punch throws it — kick still hits'},
+  bucket:  {name:'ICE BUCKET',     icon:'🧊', uses:12, range:1.3,  dmg:1.45, knock:1.1, col:'#7fd4ff', freeze:true,
+            tip:'kick freezes everyone nearby'}
+};
+const WKEYS = Object.keys(WEAPONS);
+
+// ---------- PLANSZA: osiem miejsc kurortu, każde z własną sceną i własną historią ----------
+// x0..x1 = arena (tu Greg zostaje zablokowany aż wyczyści teren), reszta drogi to spokojny marsz
+const AREAS = [
+  {name:'THE BOARDWALK', x0:520,  x1:900,  entry:'run', mobs:['zbir','zbir'],
+   intro:'Two of them are loitering by the gate. “Turn around, mate. Pool’s closed today.”',
+   clear:'Boardwalk clear. The sunbed row is next — keep walking east.',
+   warn:'PANI GOSIA (tannoy): Warning one. There is NO FIGHTING at Palm Cove.'},
+  {name:'THE SUNBED ROW', x0:1180, x1:1560, entry:'mix', mobs:['szybki','zbir','szybki'],
+   intro:'They kicked the guests off the loungers. The quick ones circle you between the beds.',
+   clear:'Sunbeds retaken. Someone left a towel and a snack behind — take them.',
+   warn:'PANI GOSIA: Warning two, Greg. I can see the whole deck from here.'},
+  {name:'THE BEACH BAR', x0:1840, x1:2220, entry:'drop', mobs:['miotacz','zbir','miotacz'],
+   intro:'The bar is theirs. Two of them vault the counter and start lobbing beach balls.',
+   clear:'Bar’s yours. The tips they stole are scattered all over the deck.',
+   warn:'PANI GOSIA: Warning three. That counter was polished this morning.'},
+  {name:'THE LIFEGUARD TOWER', x0:2500, x1:2880, entry:'drop', mobs:['ratownik','szybki','zbir'],
+   intro:'The lifeguard climbs down, and he is not here to rescue anyone. “Nobody runs on MY deck.”',
+   clear:'From the tower you can see the deep end. Natalka is still there. So is Mr Arek.',
+   warn:'PANI GOSIA: Warning four. My lifeguard, Greg. MY lifeguard.'},
+  {name:'THE SHOWERS', x0:3160, x1:3540, entry:'run', mobs:['gruby','zbir','gruby'],
+   intro:'Wet tiles, two heavy lads blocking the rinse-off. “Sit on him, boys.”',
+   clear:'Floor is slippery but clear. Cabins ahead — watch the doors.',
+   warn:'PANI GOSIA: Warning five. Somebody is mopping that up. Guess who.'},
+  {name:'THE CHANGING CABINS', x0:3820, x1:4200, entry:'drop', mobs:['szybki','ratownik','miotacz','zbir'],
+   intro:'Doors bang open one after another. Classic ambush, cabin by cabin.',
+   clear:'All doors quiet. Ahead: the VIP deck. That is where the suits stand.',
+   warn:'PANI GOSIA: Warning six. Those cabins are rented by the hour.'},
+  {name:'THE VIP DECK', x0:4480, x1:4860, entry:'mix', mobs:['ochroniarz','miotacz','ochroniarz'],
+   intro:'Velvet rope, two bouncers, one thrower. “You’re not on the list, mate.”',
+   clear:'Rope is down. One stretch left — the pool, Natalka, and Mr Arek.',
+   warn:'PANI GOSIA: Warning seven. Do NOT make me come down there.'},
+  {name:'POOLSIDE — MR AREK', x0:5000, x1:WORLD_MAX_X, entry:'run', boss:true, mobs:['arek','miotacz','ochroniarz'],
+   intro:'Mr Arek is standing over Natalka at the deep end. “My pool. Your funeral, Greg.”',
+   clear:'Mr Arek is down. Natalka is safe. The whole resort has gone very quiet.'},
 ];
 
-function spawnWave(){
-  const w = WAVES[wave];
-  if(!w) return;
-  w.mobs.forEach((type, i) => {
-    if(type === 'arek'){
-      arek = mkFighter(POOL.x - 60, {color:'#0a0a0a', beltColor:'#c00', scale:1.75, hp:Math.round(120*diff.ehp), maxHp:Math.round(120*diff.ehp),
-        dmgPunch:Math.round(9*diff.edmg), dmgKick:Math.round(13*diff.edmg), speed:1.15*diff.espd, isArek:true, facing:-1, name:'MR AREK', mass:4, specialCd:5.5});
-      enemies.push(arek);
-    } else {
-      const t = TYPES[type];
-      const ehp = Math.round(t.hp*diff.ehp);
-      enemies.push(mkFighter(POOL.x - 40 - i*60, {color:t.color, beltColor:t.belt, hp:ehp, maxHp:ehp,
-        facing:-1, speed:(t.spd[0] + Math.random()*(t.spd[1]-t.spd[0]))*diff.espd,
-        dmgPunch:Math.max(1,Math.round(t.dmgP*diff.edmg)), dmgKick:Math.max(1,Math.round(t.dmgK*diff.edmg)),
-        scale:t.scale, mass:t.mass, cdBase:t.cd, ranged:!!t.ranged, etype:type}));
-    }
+// nagrody rozsypane po drodze — po to się idzie, a nie stoi w miejscu
+const LOOT = [
+  {k:'coin', x:220},{k:'coin', x:300},{k:'coin', x:380},
+  {k:'hotdog', x:1000},{k:'coin', x:1050},{k:'coin', x:1100},{k:'weapon', w:'noodle', x:1010},
+  {k:'coin', x:1650},{k:'coin', x:1710},{k:'coin', x:1770},{k:'weapon', w:'flipflop', x:1700},
+  {k:'hotdog', x:2320},{k:'coin', x:2380},{k:'coin', x:2430},{k:'weapon', w:'umbrella', x:2360},
+  {k:'coin', x:2980},{k:'coin', x:3030},{k:'hotdog', x:3080},{k:'weapon', w:'bucket', x:3010},
+  {k:'coin', x:3640},{k:'coin', x:3700},{k:'coin', x:3760},{k:'weapon', w:'noodle', x:3690},
+  {k:'hotdog', x:4300},{k:'coin', x:4360},{k:'coin', x:4410},{k:'weapon', w:'umbrella', x:4350},
+  {k:'coin', x:4950},{k:'hotdog', x:4990},{k:'weapon', w:'bucket', x:4930}
+];
+
+// dekoracje kurortu — każde miejsce wygląda inaczej, więc widać, że się idzie dalej
+const PROPS = [
+  {t:'palm', x:90},{t:'ball', x:300},{t:'palm', x:640},{t:'sign', x:470, s:'THE BOARDWALK'},
+  {t:'palm', x:1010},
+  {t:'sign', x:1130, s:'SUNBED ROW'},
+  {t:'lounger', x:1240},{t:'parasol', x:1330},{t:'lounger', x:1420},{t:'parasol', x:1520},{t:'ball', x:1470},
+  {t:'palm', x:1700},{t:'ring', x:1780},
+  {t:'sign', x:1790, s:'BEACH BAR'},
+  {t:'bar', x:1980},{t:'palm', x:2200},{t:'ball', x:2260},
+  {t:'sign', x:2450, s:'LIFEGUARD TOWER'},
+  {t:'tower', x:2680},{t:'ring', x:2860},{t:'palm', x:2960},
+  {t:'sign', x:3110, s:'THE SHOWERS'},
+  {t:'shower', x:3250},{t:'shower', x:3420},{t:'palm', x:3560},
+  {t:'sign', x:3770, s:'CHANGING CABINS'},
+  {t:'cabin', x:3900, c:'#ff6b6b'},{t:'cabin', x:4020, c:'#4dd0e1'},{t:'cabin', x:4140, c:'#ffd54f'},
+  {t:'palm', x:4300},{t:'ball', x:4400},
+  {t:'sign', x:4430, s:'VIP DECK'},
+  {t:'plant', x:4560},{t:'rope', x:4700},{t:'plant', x:4850},
+  {t:'sign', x:4960, s:'POOLSIDE'},
+  {t:'palm', x:5080},{t:'lounger', x:5180},{t:'parasol', x:5480},{t:'ring', x:POOL.x + 52}
+];
+
+// kiosk plażowy po każdej lokacji — tu monety zamieniają się w zdrowie i broń
+const KIOSKS = AREAS.filter(a => !a.boss).map(a => ({x: a.x1 + 120}));
+KIOSKS.forEach(k => PROPS.push({t:'kiosk', x:k.x}));
+const KIOSK_PRICES = [0, 25, 40, 60];
+
+function buyAt(slot){
+  const p = player, cost = KIOSK_PRICES[slot];
+  const deny = m => { kioskMsg = m; kioskMsgT = 1.5; kioskCd = 0.4; beep(160,0.16,'square',0.07,-60); };
+  if(coins < cost) return deny('NOT ENOUGH COINS — ' + cost + ' NEEDED');
+  if(slot === 1 && p.hp >= p.maxHp) return deny('ALREADY AT FULL HEALTH');
+  if(slot === 2 && !p.weapon) return deny('NO WEAPON TO REFILL');
+  coins -= cost; kioskCd = 0.5;
+  if(slot === 1){ p.hp = p.maxHp; kioskMsg = '🌭 FULL HEALTH!'; }
+  else if(slot === 2){ p.wUses = WEAPONS[p.weapon].uses; kioskMsg = '🔧 ' + WEAPONS[p.weapon].name + ' REFILLED!'; }
+  else { const wk = WKEYS[Math.random()*WKEYS.length|0]; p.weapon = wk; p.wUses = WEAPONS[wk].uses; kioskMsg = '🎁 ' + WEAPONS[wk].name + '!'; }
+  kioskMsgT = 2;
+  addPopup(p.x, p.y - 152, kioskMsg, '#8bc34a');
+  [880,1170,1400].forEach((f,i)=>setTimeout(()=>beep(f,0.1,'square',0.07), i*70));
+  spawnConfetti(10);
+}
+
+// reżyser: najbliżsi naciera­ją, kolejni obchodzą z boku, reszta czeka w ruchu.
+// Role zmieniają się co pół sekundy, więc walka nie zastyga w jednym układzie.
+function assignRoles(){
+  const alive = enemies.filter(e => !e.dead && !e.pooled && !e.ranged && !e.isArek);
+  alive.sort((a, b) => Math.abs(a.x - player.x) - Math.abs(b.x - player.x));
+  const attackers = Math.min(2, Math.max(1, Math.round(alive.length/2)));
+  alive.forEach((e, i) => {
+    e.role = i < attackers ? 'attacker' : (i < attackers + 2 ? 'flanker' : 'waiter');
+    // co drugi ustawia się z przeciwnej strony — gracz jest brany w kleszcze
+    e.side = i % 2 === 0 ? (Math.sign(e.x - player.x) || 1) : -(Math.sign(e.x - player.x) || 1);
   });
-  msgT = 2.2;
+}
+
+function spawnArea(){
+  const a = AREAS[wave];
+  if(!a) return;
+  spawnQueue = a.mobs.map((type, i) => ({type, i}));
+  spawnT = 0;
+  spawnNextMob(); spawnNextMob();   // dwóch wita Grega od razu, reszta dochodzi w trakcie
+  msgT = 2.6;
+}
+
+// wrogowie WCHODZĄ do kadru zamiast pojawiać się gotowi: wbiegają z boku albo zeskakują z góry
+function spawnNextMob(){
+  const a = AREAS[wave];
+  if(!a || !spawnQueue.length) return;
+  const {type, i} = spawnQueue.shift();
+  const fromLeft = i % 3 === 2;
+  const entry = a.entry === 'mix' ? (i % 2 ? 'drop' : 'run') : (a.entry || 'run');
+  let sx = fromLeft ? a.x0 - 140 : a.x1 + 140;
+  sx = Math.max(WORLD_MIN_X, Math.min(WORLD_MAX_X, sx));
+
+  if(type === 'arek'){
+    arek = mkFighter(POOL.x - 90, {color:'#0a0a0a', beltColor:'#c00', scale:1.75, hp:Math.round(120*diff.ehp), maxHp:Math.round(120*diff.ehp),
+      dmgPunch:Math.round(9*diff.edmg), dmgKick:Math.round(13*diff.edmg), speed:1.15*diff.espd, isArek:true, facing:-1,
+      name:'MR AREK', mass:4, specialCd:5.5, role:'attacker'});
+    enemies.push(arek);
+    return;
+  }
+  const t = TYPES[type];
+  const ehp = Math.round(t.hp*diff.ehp);
+  const e = mkFighter(sx, {color:t.color, beltColor:t.belt, hp:ehp, maxHp:ehp,
+    facing: fromLeft ? 1 : -1, speed:(t.spd[0] + Math.random()*(t.spd[1]-t.spd[0]))*diff.espd,
+    dmgPunch:Math.max(1,Math.round(t.dmgP*diff.edmg)), dmgKick:Math.max(1,Math.round(t.dmgK*diff.edmg)),
+    scale:t.scale, mass:t.mass, cdBase:t.cd, ranged:!!t.ranged, etype:type,
+    role: 'flanker', side: fromLeft ? -1 : 1, entering: true});
+  if(entry === 'drop'){                       // zeskakuje zza baru / z wieży / z kabiny
+    e.x = Math.max(a.x0 + 40, Math.min(a.x1 - 40, player.x + (fromLeft ? -190 : 190)));
+    e.y = GROUND - 300; e.onGround = false; e.vy = 0;
+    e.pose = 'slam'; e.poseT = 0;
+  }
+  enemies.push(e);
+  beep(fromLeft ? 300 : 380, 0.09, 'square', 0.05, 90);
 }
 
 // ---------- combat ----------
 function tryAttack(a, targets, kind){
+  // broń w rękach gracza: dłuższy zasięg, mocniejsze uderzenie, większy odrzut
+  const wp = (a === player && a.weapon) ? WEAPONS[a.weapon] : null;
+  if(wp) weaponSwingFx(a, kind, wp);
   let dmg = kind==='punch' ? a.dmgPunch : a.dmgKick;
+  if(wp) dmg = Math.round(dmg * wp.dmg);
   const air = !a.onGround;
   if(air) dmg = Math.round(dmg * 1.5); // kopniak/cios w powietrzu = mocniejszy
-  const range = (kind==='punch' ? 52 : 66) * a.scale;
+  const range = (kind==='punch' ? 52 : 66) * a.scale * (wp ? wp.range : 1);
   let hit = false;
   for(const t of targets){
     if(t.dead || t.hp<=0 || t.invuln>0) continue;
@@ -391,9 +562,10 @@ function tryAttack(a, targets, kind){
         if(t.hp <= 0){ t.dead = true; t.pose = 'ko'; }
         continue;
       }
+      if(t.frozen > 0) dmg = Math.round(dmg * 1.5); // zamrożony = kruchy, obrywa mocniej
       t.hp -= dmg;
       t.hurtT = 0.35;
-      t.vx = a.facing * (kind==='kick' ? 7 : 3.5) / (t.mass || 1);
+      t.vx = a.facing * (kind==='kick' ? 7 : 3.5) * (wp ? wp.knock : 1) / (t.mass || 1);
       t.pose = 'hit'; t.poseT = 0;
       const hy2 = t.y-60*t.scale;
       burst(t.x, hy2, kind==='kick' ? '#ffb300' : '#fff', 8);
@@ -412,7 +584,7 @@ function tryAttack(a, targets, kind){
       }
       if(t.hp <= 0){
         t.dead = true; t.pose='ko';
-        if(a === player){ addScore(25, t.x, t.y - 105*t.scale); burst(t.x, t.y-50*t.scale, '#ffd43b', 14); }
+        if(a === player){ addScore(25, t.x, t.y - 105*t.scale); burst(t.x, t.y-50*t.scale, '#ffd43b', 14); maybeDropWeapon(t.x); dropCoins(t.x, 2 + (Math.random()<0.4 ? 1 : 0)); }
         if(t.isArek && a === player){ // kinowy nokaut bossa — slow-motion + rozbłysk
           slowmo = 1.4; camPunch = Math.max(camPunch, 0.08); flashT = Math.max(flashT, 0.2);
           shake = Math.max(shake, 14);
@@ -420,8 +592,9 @@ function tryAttack(a, targets, kind){
           burst(t.x, t.y-60*t.scale, '#fff', 22);
         }
       }
-      // kopniak przy krawędzi = zbir wpada do basenu!
-      if(a === player && kind==='kick' && !t.isArek && t.x > POOL.x - 80 && a.facing === 1){
+      // kopniak przy krawędzi = zbir wpada do basenu! (broń o dużym odrzucie sięga dalej)
+      const poolEdge = POOL.x - 80 - (wp ? (wp.knock - 1) * 46 : 0);
+      if(a === player && kind==='kick' && !t.isArek && t.x > poolEdge && a.facing === 1){
         t.pooled = true; t.dead = true; t.hp = 0;
         t.onGround = false; t.vx = 5; t.vy = -4.5;
         addScore(50, t.x, t.y - 120*t.scale);
@@ -430,12 +603,102 @@ function tryAttack(a, targets, kind){
       hitStop = Math.max(hitStop, kind==='kick' ? 0.07 : 0.045);
     }
   }
-  if(hit){ (kind==='punch'?sndPunch:sndKick)(); shake = Math.max(shake, kind==='kick'?5:3); }
+  if(hit){
+    (kind==='punch'?sndPunch:sndKick)();
+    shake = Math.max(shake, kind==='kick'?5:3);
+    if(wp){ beep(wp.freeze?1200:520, 0.06, 'square', 0.06); useWeapon(1); }
+  }
   else (kind==='punch'?sndPunch:sndKick)();
+  return hit;
 }
 
 function burst(x,y,color,n){
   for(let i=0;i<n;i++) particles.push({x,y,vx:(Math.random()-0.5)*6,vy:-Math.random()*5,life:0.6,color});
+}
+
+// ---------- broń: zużycie, upuszczanie, rzut klapkiem, mrożenie ----------
+function useWeapon(n){
+  const p = player;
+  if(!p.weapon) return;
+  const w = WEAPONS[p.weapon];
+  p.wUses -= (n || 1);
+  if(p.wUses === 3){                       // ostrzeżenie, zanim broń pęknie
+    addPopup(p.x, p.y - 150, '⚠️ ' + w.name + ' — 3 LEFT', '#ffab00');
+    beep(420, 0.09, 'square', 0.06, -120);
+  }
+  if(p.wUses <= 0){
+    addPopup(p.x, p.y - 150, '💥 ' + w.name + ' BROKE!', '#ff5252');
+    beep(210, 0.22, 'sawtooth', 0.09, -130);
+    for(let i=0;i<12;i++)
+      particles.push({x:p.x + p.facing*26, y:p.y - 60, vx:(Math.random()-0.5)*7, vy:-Math.random()*5, life:0.7, color:w.col});
+    p.weapon = null; p.wUses = 0;
+  }
+}
+
+function maybeDropWeapon(x){
+  if(Math.random() > 0.17) return;
+  const wk = WKEYS[Math.random()*WKEYS.length|0];
+  items.push({kind:'weapon', w:wk, x: Math.max(70, Math.min(POOL.x - 70, x)), t:0, taken:false});
+}
+
+// monety WYPADAJĄ z pokonanych — nagroda jest za walkę, nie za chodzenie po pustym decku
+function dropCoins(x, n){
+  for(let i=0;i<n;i++){
+    items.push({kind:'coin', x: x + (Math.random()-0.5)*24, y: GROUND - 70 - Math.random()*30,
+      vx:(Math.random()-0.5)*3.4, vy:-3.5 - Math.random()*2.5, t:0, taken:false, flying:true});
+  }
+}
+
+// każda broń ma własny zamach, dźwięk i ślad — widać, czym się bije
+function weaponSwingFx(p, kind, w){
+  if(p.weapon === 'noodle'){
+    wfx.push({t:'wSweep', x:p.x, y:p.y - 58*p.scale, f:p.facing, col:w.col, life:0.28, s:p.scale});
+    beep(330, 0.13, 'sine', 0.06, -140);
+  } else if(p.weapon === 'umbrella'){
+    wfx.push({t:'wSmash', x:p.x + p.facing*56, y:GROUND, col:w.col, life:0.32, s:p.scale});
+    beep(140, 0.17, 'sawtooth', 0.09, -70);
+    if(kind === 'kick'){                     // młot z góry — fala rozrzuca wszystkich wokół
+      shake = Math.max(shake, 9); hitStop = Math.max(hitStop, 0.06);
+      shocks.push({x:p.x + p.facing*56, r:10, life:0.4});
+      for(const t of enemies){
+        if(t.dead || t.pooled) continue;
+        if(Math.abs(t.x - p.x) < 155){
+          t.vx += Math.sign(t.x - p.x || p.facing) * 5.5 / (t.mass||1);
+          t.hurtT = Math.max(t.hurtT, 0.26); t.spec = null;
+        }
+      }
+    }
+  } else if(p.weapon === 'bucket'){
+    wfx.push({t:'wFrost', x:p.x + p.facing*40, y:p.y - 56*p.scale, f:p.facing, col:w.col, life:0.4, s:p.scale});
+    beep(1300, 0.1, 'sine', 0.05, -500);
+  }
+}
+
+function tossFlop(p){
+  p.pose='punch'; p.poseT=0; p.attackCd=0.34; p.vx = p.facing*2.2;
+  // klapek wraca jak bumerang — złapany oddaje jedno użycie
+  balls.push({x:p.x + p.facing*22, y:p.y - 62*p.scale, vx:p.facing*9.5, vy:0, rot:0,
+    from:'player', bounces:0, flop:true, boom:true, bt:0, dir:p.facing, hits:[]});
+  beep(760, 0.07, 'square', 0.07, -180);
+  useWeapon(1);
+}
+
+function freezeBlast(p){
+  let any = false;
+  for(const e of enemies){
+    if(e.dead || e.pooled) continue;
+    if(Math.abs(e.x - p.x) < 175){
+      e.frozen = e.isArek ? 1.1 : 2.1; // boss mrozi się krócej
+      e.pose = 'idle'; e.vx = 0; any = true;
+      for(let i=0;i<8;i++)
+        particles.push({x:e.x + (Math.random()-0.5)*24, y:e.y - Math.random()*80, vx:(Math.random()-0.5)*2, vy:-Math.random()*1.5, life:0.6, color:'#bfeaff'});
+    }
+  }
+  if(any){
+    addPopup(p.x, p.y - 140, '🧊 DEEP FREEZE!', '#7fd4ff');
+    beep(1500, 0.18, 'sine', 0.07, -700); beep(900, 0.25, 'triangle', 0.05, -400);
+    flashT = Math.max(flashT, 0.12);
+  }
 }
 
 function fireWater(p){
@@ -450,6 +713,151 @@ function fireWater(p){
   beep(880, 0.05, 'sine', 0.05, 400); beep(300, 0.08, 'sawtooth', 0.04, -150);
   camPunch = Math.max(camPunch, 0.02);
 }
+
+// ---------- GAZ ŁZAWIĄCY (jedyna broń Grega) ----------
+function sprayGas(p){
+  gasCd = 0.42;
+  p.pose = 'spray'; p.poseT = 0;
+  p.moveVx -= p.facing * 1.0;            // lekki odrzut od puszki
+  const mx = p.x + p.facing*26*p.scale, my = p.y - 56*p.scale;
+  // chmura gazu leci przed siebie, rośnie i rozwiewa się
+  gasClouds.push({x:mx, y:my, vx:p.facing*4.4, vy:-0.5, r:10, maxR:70+Math.random()*14, life:2.4, seed:Math.random()*99, owner:'player'});
+  // syk z dyszy
+  for(let i=0;i<10;i++) gasPuffs.push({x:mx, y:my, vx:p.facing*(3+Math.random()*3), vy:(Math.random()-0.5)*2.4, r:3+Math.random()*4, life:0.4+Math.random()*0.3});
+  beep(2200, 0.18, 'sawtooth', 0.025, -1600); // „pssssst"
+  beep(520, 0.1, 'triangle', 0.02, -200);
+  camPunch = Math.max(camPunch, 0.015);
+}
+
+function updateGas(dt){
+  // chmury: rosną, dryfują, blakną, gazują wrogów w zasięgu
+  for(const g of gasClouds){
+    g.life -= dt;
+    g.r += (g.maxR - g.r) * 0.06;
+    g.x += g.vx; g.y += g.vy; g.vx *= 0.94; g.vy += -0.015; g.vy *= 0.96;
+    if(g.life < 0.9) g.r *= 0.985;       // pod koniec się rozwiewa
+    if(Math.random() < 0.5) gasPuffs.push({x:g.x+(Math.random()-0.5)*g.r*1.2, y:g.y+(Math.random()-0.5)*g.r, vx:(Math.random()-0.5)*0.6, vy:-0.3-Math.random()*0.4, r:6+Math.random()*10, life:0.6+Math.random()*0.5});
+    for(const e of enemies){
+      if(e.dead || e.pooled || e.frozen>0) continue;
+      const dx = e.x - g.x, dy = (e.y - 46) - g.y;
+      if(dx*dx + dy*dy < (g.r*0.9)*(g.r*0.9)){
+        e.gasT = Math.max(e.gasT||0, 1.4);
+        e.hp -= 9 * dt;                   // kaszle i słabnie w chmurze
+        if(e.hp <= 0 && !e.dead){ e.dead = true; e.pose='ko'; addScore(25, e.x, e.y-100); }
+      }
+    }
+  }
+  gasClouds = gasClouds.filter(g => g.life > 0 && g.r > 3);
+  for(const pf of gasPuffs){ pf.x += pf.vx; pf.y += pf.vy; pf.vy -= 0.01; pf.r += dt*14; pf.life -= dt; }
+  gasPuffs = gasPuffs.filter(pf => pf.life > 0);
+}
+
+// ---------- TECHNIKI KARATE ----------
+// Wspólne trafienie dla technik specjalnych (zwykłe ciosy nadal idą przez tryAttack)
+function hitEnemy(t, dmg, vx, vy, launch){
+  if(t.frozen > 0) dmg = Math.round(dmg*1.5);
+  t.hp -= dmg; t.hurtT = 0.42; t.spec = null; t.specHit = false;
+  t.vx = vx / (t.mass || 1);
+  if(vy){ t.vy = vy / Math.sqrt(t.mass || 1); t.onGround = false; }
+  t.pose = 'hit'; t.poseT = 0;
+  const hy = t.y - 60*t.scale;
+  burst(t.x, hy, launch ? '#fff176' : '#ffb300', 11);
+  hitFx.push({x:t.x, y:hy, r:10*t.scale, life:0.26, big:true});
+  combo++; comboT = 1.6;
+  superCharge = Math.min(100, superCharge + 18);
+  addScore(launch ? 35 : 25, t.x, hy);
+  if(t.hp <= 0){
+    t.dead = true; t.pose = 'ko';
+    addScore(25, t.x, hy); burst(t.x, hy, '#ffd43b', 14);
+    maybeDropWeapon(t.x); dropCoins(t.x, 2);
+  }
+}
+
+function karateFx(p, kind, col){
+  wfx.push({t:kind, x:p.x, y:p.y, f:p.facing, col, life:0.34, s:p.scale});
+}
+
+// 3. cios w serii — PODBRÓDKOWY, wyrzuca przeciwnika w powietrze
+function doUppercut(p){
+  p.pose='upper'; p.poseT=0; p.attackCd=0.46; p.vx = p.facing*2.2; p.vy = -3.4; p.onGround = false;
+  flashT = Math.max(flashT, 0.12); shake = Math.max(shake, 8); camPunch = Math.max(camPunch, 0.055);
+  addPopup(p.x, p.y-165, '👊 UPPERCUT!', '#fff176');
+  beep(180,0.15,'square',0.1,140); beep(520,0.22,'sawtooth',0.07,280);
+  karateFx(p, 'upperFx', '#fff176');
+  const dmg = Math.round(p.dmgPunch*1.9);
+  for(const t of enemies){
+    if(t.dead || t.pooled || t.invuln>0) continue;
+    const d = t.x - p.x;
+    if(Math.sign(d||1) === p.facing && Math.abs(d) < 84*p.scale && Math.abs(t.y - p.y) < 92)
+      hitEnemy(t, dmg, p.facing*4, -11, true);
+  }
+  hitStop = Math.max(hitStop, 0.09);
+  if(p.weapon) useWeapon(1);
+}
+
+// 2. kopnięcie w serii — Z OBROTU, sięga w obie strony
+function doSpinKick(p){
+  p.pose='spin'; p.poseT=0; p.attackCd=0.6; p.vx = p.facing*5.4;
+  shake = Math.max(shake, 10); camPunch = Math.max(camPunch, 0.05);
+  addPopup(p.x, p.y-165, '🦵 SPIN KICK!', '#ffb300');
+  beep(120,0.2,'sawtooth',0.12,-60); beep(760,0.15,'square',0.06,-320);
+  karateFx(p, 'spinFx', '#ffb300');
+  const dmg = Math.round(p.dmgKick*1.8);
+  for(const t of enemies){
+    if(t.dead || t.pooled || t.invuln>0) continue;
+    if(Math.abs(t.x - p.x) < 98*p.scale && Math.abs(t.y - p.y) < 92)
+      hitEnemy(t, dmg, Math.sign(t.x - p.x || p.facing)*12, -4.5);
+  }
+  hitStop = Math.max(hitStop, 0.08);
+  if(p.weapon) useWeapon(1);
+}
+
+// GARDA + KOPNIĘCIE — PODCIĘCIE, kładzie przeciwników na deski
+function doSweep(p){
+  p.pose='sweep'; p.poseT=0; p.attackCd=0.64; p.vx = p.facing*1.8; p.blocking = false;
+  beep(90,0.17,'sawtooth',0.1,-40); beep(420,0.1,'square',0.05,-200);
+  addPopup(p.x, p.y-145, '🌀 SWEEP!', '#7fd4ff');
+  karateFx(p, 'sweepFx', '#7fd4ff');
+  const dmg = Math.round(p.dmgKick*1.15);
+  let any = false;
+  for(const t of enemies){
+    if(t.dead || t.pooled || t.invuln>0) continue;
+    const d = t.x - p.x;
+    if(Math.sign(d||1) === p.facing && Math.abs(d) < 94*p.scale && t.onGround){
+      hitEnemy(t, dmg, p.facing*5, -5.5);
+      t.knockT = 1.15; any = true;                      // leży i wstaje
+    }
+  }
+  if(any){ shake = Math.max(shake, 7); hitStop = Math.max(hitStop, 0.07); }
+  if(p.weapon) useWeapon(1);
+}
+
+// KOPNIĘCIE Z WYSKOKU — w locie, najmocniejsze zwykłe uderzenie
+function doFlyingKick(p){
+  p.pose='fly'; p.poseT=0; p.attackCd=0.44;
+  p.vx = p.facing*7.5; p.vy = Math.min(p.vy, -2);
+  beep(300,0.13,'square',0.07,-120); beep(150,0.16,'sawtooth',0.08,-50);
+  addPopup(p.x, p.y-155, '✈️ FLYING KICK!', '#ff5fa2');
+  karateFx(p, 'flyFx', '#ff5fa2');
+  const dmg = Math.round(p.dmgKick*2.0);
+  for(const t of enemies){
+    if(t.dead || t.pooled || t.invuln>0) continue;
+    const d = t.x - p.x;
+    if(Math.sign(d||1) === p.facing && Math.abs(d) < 90*p.scale && Math.abs(t.y - p.y) < 115)
+      hitEnemy(t, dmg, p.facing*11, -6);
+  }
+  hitStop = Math.max(hitStop, 0.07);
+  if(p.weapon) useWeapon(1);
+}
+
+// techniki specjalne przeciwników — każdy typ ma własną, zapowiadaną ruchem
+const SPECIALS = {
+  szybki:     {kind:'dash',   vx:12,  vy:0,   tell:0.26, dur:0.36, cd:[3.5,2.5], pose:'fly',     col:'#4db6ff', name:'DASH'},
+  gruby:      {kind:'charge', vx:7,   vy:0,   tell:0.44, dur:0.7,  cd:[5,3],     pose:'slamRun', col:'#ffb703', name:'BELLY CHARGE'},
+  ratownik:   {kind:'jump',   vx:6.4, vy:-11, tell:0.3,  dur:0.95, cd:[4,2.5],   pose:'fly',     col:'#ff5252', name:'JUMP KICK'},
+  ochroniarz: {kind:'barge',  vx:8.5, vy:0,   tell:0.5,  dur:0.75, cd:[5.5,3],   pose:'slamRun', col:'#7fd4ff', name:'SHOULDER BARGE'},
+  zbir:       {kind:'sweep',  vx:3.4, vy:0,   tell:0.3,  dur:0.34, cd:[5,3],     pose:'sweep',   col:'#e8ecff', name:'SWEEP'}
+};
 
 function doSuper(){
   const p = player;
@@ -528,8 +936,11 @@ function update(dt){
   shocks = shocks.filter(s=>s.life>0);
   hitFx.forEach(h=>{h.r += dt*(h.big?280:200); h.life -= dt;});
   hitFx = hitFx.filter(h=>h.life>0);
+  wfx.forEach(w=>w.life -= dt);
+  wfx = wfx.filter(w=>w.life>0);
   camPunch = Math.max(0, camPunch - dt*0.28);
   dmgVig = Math.max(0, dmgVig - dt*1.8);
+  bannerT = Math.max(0, bannerT - dt);
   trail.forEach(g=>g.life -= dt);
   trail = trail.filter(g=>g.life>0);
   confetti.forEach(c=>{ c.x+=c.vx; c.y+=c.vy; c.vy+=0.02; c.rot+=c.vr; c.vx+=Math.sin(time*3+c.y*0.05)*0.05; c.life-=dt; });
@@ -542,9 +953,28 @@ function update(dt){
   if(comboT > 0){ comboT -= dt; if(comboT <= 0) combo = 0; }
   flashT = Math.max(0, flashT - dt);
 
+  // W scenkach fizyka nie jest wołana, więc liczniki błysku stały w miejscu
+  // i postacie migały bez końca. Tutaj odliczają się same.
+  if(state !== 'fight'){
+    if(player){ player.hurtT = Math.max(0, player.hurtT - dt); player.invuln = Math.max(0, player.invuln - dt); }
+    if(enemies) for(const e of enemies){ e.hurtT = Math.max(0, e.hurtT - dt); e.invuln = Math.max(0, e.invuln - dt); }
+  }
+
   if(state==='fight') updateFight(dt);
   else if(state==='lose') updateLose(dt);
   else if(state==='win') updateWin(dt);
+}
+
+// dokąd wolno danej postaci dojść — gracz jest zamknięty w arenie, dopóki jej nie wyczyści
+function limitsFor(f){
+  const a = AREAS[wave];
+  if(areaPhase === 'fight' && a){
+    if(f === player) return [Math.max(WORLD_MIN_X, a.x0 - 70), a.x1];
+    // wrogowie też siedzą w arenie — inaczej miotacz ucieka tam, gdzie gracz nie wejdzie
+    if(f.entering) return [WORLD_MIN_X, WORLD_MAX_X];
+    return [Math.max(WORLD_MIN_X, a.x0 - 130), a.x1];
+  }
+  return [WORLD_MIN_X, WORLD_MAX_X];
 }
 
 function physics(f, dt){
@@ -560,7 +990,11 @@ function physics(f, dt){
       }
     }
   }
-  f.x = Math.max(30, Math.min(POOL.x - 15, f.x));
+  const lim = limitsFor(f);
+  f.x = Math.max(lim[0], Math.min(lim[1], f.x));
+  // płynny obrót zamiast natychmiastowego lustra — postać realnie się odwraca
+  if(f.faceX === undefined) f.faceX = f.facing;
+  f.faceX += (f.facing - f.faceX) * Math.min(1, dt*16);
   f.attackCd = Math.max(0, f.attackCd - dt);
   f.hurtT = Math.max(0, f.hurtT - dt);
   f.invuln = Math.max(0, f.invuln - dt);
@@ -573,19 +1007,36 @@ function updateFight(dt){
   const p = player;
   let moving = false, targetVx = 0;
   p.blocking = false;
-  if(keys['s'] && p.onGround && p.hurtT<=0 && !['punch','kick'].includes(p.pose)){
-    p.blocking = true; p.pose = 'block';
-  } else if(p.hurtT<=0 && !['punch','kick'].includes(p.pose) || p.poseT>0.25){
+
+  // ---- KIOSK: poza walką można wymienić monety na zdrowie, naprawę broni albo nową broń ----
+  kioskMsgT = Math.max(0, kioskMsgT - dt);
+  kioskCd = Math.max(0, kioskCd - dt);
+  kioskNear = null;
+  if(areaPhase !== 'fight'){
+    for(const k of KIOSKS) if(Math.abs(p.x - k.x) < 80){ kioskNear = k; break; }
+  }
+  if(kioskNear && kioskCd <= 0){
+    if(keys['1'] || keys['j']){ keys['1'] = keys['j'] = false; buyAt(1); }
+    else if(keys['2'] || keys['k']){ keys['2'] = keys['k'] = false; buyAt(2); }
+    else if(keys['3'] || keys['l']){ keys['3'] = keys['l'] = false; buyAt(3); }
+  }
+  p.chainT = Math.max(0, p.chainT - dt);
+  if(p.chainT <= 0) p.chain = 0;
+  const ATK_POSES = ['punch','kick','upper','spin','sweep','fly','spray'];
+  if(keys['s'] && p.onGround && p.hurtT<=0 && !ATK_POSES.includes(p.pose)){
+    p.blocking = true; p.pose = 'block';   // sama obrona — Greg nie bije, tylko gazuje
+  } else if(p.hurtT<=0 && !ATK_POSES.includes(p.pose) || p.poseT>0.25){
     if(p.pose==='block') p.pose='idle';
     if(keys['arrowleft']||keys['a']){ targetVx = -p.speed; p.facing=-1; moving=true; }
     if(keys['arrowright']||keys['d']){ targetVx = p.speed; p.facing=1; moving=true; }
     if((keys['arrowup']||keys['w']||keys[' ']) && p.onGround){ p.vy=-10.6; p.onGround=false; p.squash=-0.18; }
-    if(keys['j'] && p.attackCd<=0){ p.pose='punch'; p.poseT=0; p.attackCd=0.32; p.vx = p.facing*3.2; tryAttack(p, enemies, 'punch'); }
-    else if(keys['k'] && p.attackCd<=0){ p.pose='kick'; p.poseT=0; p.attackCd=0.55; p.vx = p.facing*4.2; tryAttack(p, enemies, 'kick'); }
-    else if(keys['f'] && waterCd<=0 && p.attackCd<=0){ fireWater(p); }
+    // GREG MA TYLKO GAZ ŁZAWIĄCY — jeden przycisk natarcia (J / K / F / spacja-atak)
+    if((keys['j'] || keys['k'] || keys['f']) && gasCd<=0 && p.attackCd<=0){
+      sprayGas(p);
+    }
   }
-  waterCd = Math.max(0, waterCd - dt);
-  if(keys['l']){ keys['l'] = false; doSuper(); }
+  gasCd = Math.max(0, gasCd - dt);
+  if(p.pose==='spray' && p.poseT>0.3) p.pose='idle';
   // płynne przyspieszanie/hamowanie zamiast skokowej prędkości
   const accel = targetVx !== 0 ? 0.22 : 0.30;
   p.moveVx += (targetVx - p.moveVx) * accel;
@@ -601,12 +1052,22 @@ function updateFight(dt){
   if(p.pose==='kick'&&p.poseT>0.31) p.pose='idle';
   if(p.pose==='shoot'&&p.poseT>0.22) p.pose='idle';
   if(p.pose==='hit'&&p.poseT>0.3) p.pose='idle';
-  if(moving && (p.pose==='idle'||p.pose==='walk')){ p.pose='walk'; p.walkT += dt*11; }
-  else if(!moving && p.pose==='walk'){ if(Math.abs(p.moveVx) < 0.5) p.pose='idle'; else p.walkT += dt*11; }
+  if(p.pose==='upper'&&p.poseT>0.40) p.pose='idle';
+  if(p.pose==='spin' &&p.poseT>0.44) p.pose='idle';
+  if(p.pose==='sweep'&&p.poseT>0.42) p.pose='idle';
+  if(p.pose==='fly'  &&(p.onGround || p.poseT>0.7)) p.pose='idle';
+  // tempo kroku zgrane z realną prędkością — stopy nie ślizgają się po deskach
+  const gait = 5.2 + Math.abs(p.moveVx)*3.0;
+  if(moving && (p.pose==='idle'||p.pose==='walk')){ p.pose='walk'; p.walkT += dt*gait; }
+  else if(!moving && p.pose==='walk'){ if(Math.abs(p.moveVx) < 0.5) p.pose='idle'; else p.walkT += dt*gait; }
   physics(p, dt);
   // smugi ruchu (afterimages) — przy super, aktywnym kopnięciu lub szybkim biegu
   const trailing = flashT>0.05 || (p.pose==='kick' && p.poseT<0.22) || Math.abs(p.moveVx)>2.7;
-  if(trailing){ trail.push(Object.assign({}, p, {isAdam:true, ghost:true, name:'', life:0.2})); if(trail.length>10) trail.shift(); }
+  if(trailing){ trail.push(Object.assign({}, p, {isGreg:true, ghost:true, name:'', life:0.2})); if(trail.length>10) trail.shift(); }
+
+  // reżyser walki — kto teraz naciera, kto obchodzi, kto czeka (co pół sekundy)
+  roleT -= dt;
+  if(roleT <= 0){ roleT = 0.45; assignRoles(); }
 
   // enemies AI
   for(const e of enemies){
@@ -624,6 +1085,50 @@ function updateFight(dt){
       continue;
     }
     if(e.dead){ continue; }
+    // wszedł już na arenę — od tej chwili obowiązują go jej granice
+    if(e.entering){
+      const ar0 = AREAS[wave];
+      if(!ar0 || (e.x > ar0.x0 - 40 && e.x < ar0.x1 - 10)) e.entering = false;
+    }
+    // powalony podcięciem — leży, po chwili wstaje
+    if(e.knockT > 0){
+      e.knockT -= dt; e.pose = 'ko'; e.vx *= 0.86;
+      physics(e, dt);
+      if(e.knockT <= 0){ e.pose='idle'; e.poseT=0; e.attackCd = 0.45; e.spec = null; }
+      continue;
+    }
+    // zamrożony lodem z wiaderka — stoi jak sopel, ale można go okładać
+    if(e.frozen > 0){
+      e.frozen -= dt;
+      if(e.pose !== 'hit' || e.poseT > 0.35) e.pose = 'idle';
+      e.vx *= 0.7;
+      if(Math.random() < 0.22)
+        particles.push({x:e.x + (Math.random()-0.5)*24, y:e.y - Math.random()*76, vx:0, vy:0.6, life:0.45, color:'#dff4ff'});
+      physics(e, dt);
+      continue;
+    }
+    // ZAGAZOWANY — kaszle, zasłania oczy, zatacza się od Grega, nie atakuje
+    if(e.gasT > 0){
+      e.gasT -= dt;
+      e.facing = Math.sign(e.x - p.x || 1);     // odwraca się od gazu
+      e.vx += (Math.sign(e.x - p.x || 1) * 0.5 - e.vx*0.1); // słania się tyłem
+      e.walkT += dt*18; e.pose = 'cough';
+      if(Math.random() < 0.3)
+        particles.push({x:e.x + (Math.random()-0.5)*18, y:e.y - 50 - Math.random()*30, vx:(Math.random()-0.5)*1, vy:-0.4, life:0.5, color:'rgba(190,210,120,0.8)'});
+      physics(e, dt);
+      continue;
+    }
+    // wejście z góry — zeskok zza baru, z wieży albo z dachu kabiny
+    if(!e.isArek && e.pose === 'slam'){
+      physics(e, dt);
+      if(e.onGround){
+        e.pose = 'idle'; e.poseT = 0;
+        shake = Math.max(shake, 5); beep(95, 0.13, 'sine', 0.08, -45);
+        for(let k=0;k<12;k++)
+          particles.push({x:e.x + (Math.random()-0.5)*28, y:GROUND, vx:(Math.random()-0.5)*5, vy:-Math.random()*3.2, life:0.5, color:'#e0cda8'});
+      }
+      continue;
+    }
     const dx = p.x - e.x;
     // AREK: skok + uderzenie w ziemię (fala wstrząsowa)
     if(e.isArek){
@@ -647,17 +1152,22 @@ function updateFight(dt){
     // MIOTACZ: trzyma dystans i rzuca piłkami plażowymi
     if(e.ranged){
       const d = Math.abs(dx);
+      e.strafeT -= dt;
+      if(e.strafeT <= 0){ e.strafeT = 0.6 + Math.random()*0.8; e.strafeDir = Math.random()<0.5 ? -1 : 1; }
       if(e.hurtT<=0){
-        if(d < 150){ e.vx = -e.facing*e.speed; e.walkT += dt*8; e.pose='walk'; }
-        else if(d > 300){ e.vx = e.facing*e.speed; e.walkT += dt*8; e.pose='walk'; }
-        else {
-          if(e.pose==='walk') e.pose='idle';
-          if(e.attackCd<=0){
-            e.attackCd = e.cdBase + Math.random()*0.7;
-            e.pose='punch'; e.poseT=0;
-            balls.push({x:e.x + e.facing*16, y:e.y - 62*e.scale, vx:e.facing*(4.2+Math.random()), vy:-3.2, rot:0, from:'enemy', bounces:0});
-            beep(500, 0.07, 'sine', 0.06);
-          }
+        let vx;
+        if(fightT > 40) vx = e.facing*e.speed;         // przeciągnięta walka — koniec uciekania
+        else if(d < 170) vx = -e.facing*e.speed;       // za blisko — wycofuje się
+        else if(d > 300) vx = e.facing*e.speed;        // za daleko — dochodzi
+        else vx = e.strafeDir*e.speed*0.5;             // w zasięgu — krąży, nie stoi
+        e.vx = vx;
+        e.walkT += dt*(4.2 + Math.abs(vx)*3.1);
+        if(e.pose==='idle') e.pose='walk';
+        if(d >= 150 && d <= 330 && e.attackCd<=0){
+          e.attackCd = e.cdBase*0.7 + Math.random()*0.6;
+          e.pose='punch'; e.poseT=0;
+          balls.push({x:e.x + e.facing*16, y:e.y - 62*e.scale, vx:e.facing*(4.2+Math.random()), vy:-3.2, rot:0, from:'enemy', bounces:0});
+          beep(500, 0.07, 'sine', 0.06);
         }
       }
       if(e.pose==='punch'&&e.poseT>0.25) e.pose='idle';
@@ -665,19 +1175,81 @@ function updateFight(dt){
       physics(e, dt);
       continue;
     }
-    const range = 46*e.scale + e.stopOff; // każdy staje w trochę innym miejscu
-    if(e.hurtT<=0){
-      if(Math.abs(dx) > range){ e.vx = e.facing * e.speed; e.walkT += dt*8; if(e.pose==='idle'||e.pose==='walk') e.pose='walk'; }
-      else {
-        e.pose = e.pose==='walk' ? 'idle' : e.pose;
-        if(e.attackCd<=0){
-          const kick = Math.random()<0.35;
-          e.pose = kick?'kick':'punch'; e.poseT=0;
-          e.attackCd = e.isArek ? 1.7 : e.cdBase + Math.random()*0.6;
-          e.vx = e.facing * (kick?3:2);
-          tryAttack(e, [p], kick?'kick':'punch');
-          if(p.hp<=0) break;
+    // ---- TECHNIKI SPECJALNE PRZECIWNIKÓW: doskok, szarża, kopniak z wyskoku, podcięcie ----
+    const sp = SPECIALS[e.etype];
+    if(sp && !e.isArek){
+      const dS = Math.abs(dx), reachS = 44*e.scale + e.stopOff*0.8;
+      e.specialCd -= dt;
+      if(e.spec){
+        if(e.hurtT > 0 && e.etype !== 'ochroniarz'){ e.spec = null; e.specHit = false; } // ochroniarz prze dalej
+        else {
+          e.specT += dt;
+          if(e.tellT > 0){                       // zapowiedź — widać, że coś szykuje
+            e.tellT -= dt; e.pose = 'ready'; e.vx *= 0.7;
+            if(e.tellT <= 0){
+              e.pose = sp.pose; e.poseT = 0;
+              e.vx = e.facing*sp.vx;
+              if(sp.vy){ e.vy = sp.vy; e.onGround = false; }
+              beep(sp.kind==='sweep' ? 110 : 230, 0.13, 'sawtooth', 0.07, -60);
+            }
+            physics(e, dt); continue;
+          }
+          if(sp.kind !== 'jump' || !e.onGround) e.vx = e.facing*sp.vx;
+          e.walkT += dt*9;
+          if(!e.specHit && Math.abs(p.x - e.x) < 64*e.scale && Math.abs(p.y - e.y) < 100){
+            e.specHit = true;
+            tryAttack(e, [p], sp.kind === 'sweep' ? 'kick' : 'punch');
+            if(p.hp<=0) break;
+          }
+          if(e.specT > sp.dur || (sp.kind === 'jump' && e.onGround && e.specT > 0.25)){
+            e.spec = null; e.specHit = false; e.pose = 'idle'; e.poseT = 0; e.attackCd = 0.4;
+          }
+          physics(e, dt); continue;
         }
+      }
+      if(e.specialCd <= 0 && dS > reachS + 40 && dS < 340 && e.onGround && e.hurtT <= 0){
+        e.spec = sp; e.specT = 0; e.specHit = false; e.tellT = sp.tell;
+        e.specialCd = sp.cd[0] + Math.random()*sp.cd[1];
+        e.pose = 'ready'; e.poseT = 0;
+        addPopup(e.x, e.y - 120*e.scale, sp.name + '!', sp.col);
+        beep(920, 0.07, 'square', 0.05);
+        physics(e, dt); continue;
+      }
+    }
+
+    // ---- zwarcie: reżyser rozdaje role, dzięki czemu nikt nie stoi jak słup ----
+    const d = Math.abs(dx);
+    const reach = 44*e.scale + e.stopOff*0.8;
+    const side = e.side || Math.sign(e.x - p.x) || 1;
+    e.strafeT -= dt;
+    if(e.strafeT <= 0){ e.strafeT = 0.45 + Math.random()*0.8; e.strafeDir = Math.random()<0.5 ? -1 : 1; }
+    if(e.hurtT<=0){
+      const attacker = e.isArek || e.role === 'attacker' || fightT > 40;
+      if(attacker && d <= reach + 8 && e.attackCd<=0){
+        const kick = Math.random()<0.38;
+        e.pose = kick?'kick':'punch'; e.poseT=0;
+        e.attackCd = e.isArek ? 1.15 + Math.random()*0.5 : e.cdBase*0.55 + Math.random()*0.5;
+        e.vx = e.facing * (kick?3.4:2.4);
+        tryAttack(e, [p], kick?'kick':'punch');
+        if(p.hp<=0) break;
+      } else {
+        // dystans, na jakim chce stać dana rola — i ciągły ruch zamiast bezczynności
+        const want = attacker ? reach
+                   : e.role === 'flanker' ? reach + 74 + e.stopOff*3
+                   : reach + 168 + e.stopOff*4;
+        const tx = p.x + side*want;
+        const err = tx - e.x;
+        let vx;
+        if(Math.abs(err) > 14){
+          vx = Math.sign(err) * e.speed * (Math.sign(err) === e.facing ? 1 : 0.8);
+          if(e.etype === 'szybki' && Math.abs(err) > 90) vx *= 1.55;      // szybcy robią doskoki
+          if(e.etype === 'ochroniarz' && Math.abs(err) > 50) vx *= 1.18;  // ochroniarz szarżuje barkiem
+        } else {
+          vx = e.strafeDir * e.speed * 0.45;                              // przestępowanie z nogi na nogę
+        }
+        e.vx = vx;
+        e.walkT += dt*(4.2 + Math.abs(vx)*3.1);
+        if(e.pose==='idle'||e.pose==='walk') e.pose='walk';
       }
     }
     if(e.pose==='punch'&&e.poseT>0.25) e.pose='idle';
@@ -716,8 +1288,25 @@ function updateFight(dt){
 
   // piłki plażowe (pociski miotaczy)
   for(const b of balls){
-    b.x += b.vx; b.y += b.vy; b.vy += 0.22; b.rot += 0.2;
-    if(b.y >= GROUND - 9){ b.y = GROUND - 9; b.vy = -Math.abs(b.vy)*0.55; b.bounces++; }
+    if(b.boom){
+      // klapek-bumerang: wylatuje, wyhamowuje, zawraca i sam wraca do ręki
+      b.bt += dt;
+      b.vx = b.dir * Math.max(-12, 9.5 * (1 - b.bt/0.5));
+      b.vy = ((p.y - 62) - b.y) * 0.09;          // celuje z powrotem w wysokość ręki
+      b.x += b.vx; b.y += b.vy; b.rot += 0.45;
+      if(b.bt > 0.55 && Math.abs(b.x - p.x) < 42 && !p.dead){
+        b.deadBall = true;
+        if(p.weapon === 'flipflop'){
+          p.wUses++;
+          addPopup(p.x, p.y - 138, '🩴 CAUGHT! +1', '#8bc34a');
+          beep(1400, 0.07, 'square', 0.07); beep(1900, 0.06, 'square', 0.05);
+        }
+        continue;
+      }
+    } else {
+      b.x += b.vx; b.y += b.vy; b.vy += 0.22; b.rot += 0.2;
+      if(b.y >= GROUND - 9){ b.y = GROUND - 9; b.vy = -Math.abs(b.vy)*0.55; b.bounces++; }
+    }
     if(b.from==='enemy' && Math.abs(b.x - p.x) < 26 && b.y > p.y - 90 && !p.dead){
       if(p.blocking){
         b.from = 'player'; b.vx = -b.vx * 1.15; b.vy = -3.5; b.bounces = 0;
@@ -732,23 +1321,26 @@ function updateFight(dt){
     if(b.from==='player'){
       for(const e of enemies){
         if(e.dead || e.pooled) continue;
+        if(b.hits && b.hits.indexOf(e) >= 0) continue;   // bumerang nie tłucze w kółko tego samego
         if(Math.abs(b.x - e.x) < 30 && b.y > e.y - 95*e.scale){
           e.hp -= 15; e.hurtT = 0.35; e.pose='hit'; e.poseT=0;
           e.vx = Math.sign(b.vx) * 3 / (e.mass||1);
           addScore(20, e.x, e.y - 95*e.scale);
           addPopup(e.x, e.y - 118*e.scale, 'RICOCHET!', '#ffd43b');
           burst(b.x, b.y, '#ffb300', 8);
-          b.deadBall = true;
-          if(e.hp <= 0){ e.dead = true; e.pose='ko'; addScore(25, e.x, e.y - 105*e.scale); }
+          if(b.boom) b.hits.push(e); else b.deadBall = true;   // klapek leci dalej i wraca
+          if(e.hp <= 0){ e.dead = true; e.pose='ko'; addScore(25, e.x, e.y - 105*e.scale); maybeDropWeapon(e.x); dropCoins(e.x, 2); }
           break;
         }
       }
     }
-    if(b.x < -20 || b.x > W + 20 || b.bounces >= 3) b.deadBall = true;
+    // granice liczone względem gracza — niezależne od stanu kamery
+    if(Math.abs(b.x - p.x) > 900) b.deadBall = true;
+    if(b.boom ? b.bt > 2.4 : b.bounces >= 3) b.deadBall = true;
   }
   balls = balls.filter(b=>!b.deadBall);
 
-  // pociski wody z blastera Adama
+  // pociski wody z blastera Grega
   for(const s of waterShots){
     s.x += s.vx; s.y += s.vy; s.vy += 0.12; s.life -= dt;
     // ślad kropelek
@@ -769,42 +1361,128 @@ function updateFight(dt){
         s.life = 0; break;
       }
     }
-    if(s.x < -30 || s.x > W+30) s.life = 0;
+    if(Math.abs(s.x - p.x) > 720) s.life = 0;
   }
   waterShots = waterShots.filter(s=>s.life>0);
+  updateGas(dt);
 
-  // hot-dogi leczące
+  // znajdźki na decku: hot-dogi leczące + broń do podniesienia
   for(const it of items){
     it.t += dt;
-    if(!it.taken && Math.abs(p.x - it.x) < 30 && p.onGround){
+    const loose = it.kind === 'coin' || it.kind === 'medal';
+    // monety wybite z przeciwnika lecą łukiem i lądują na deskach
+    if(it.flying){
+      it.x += it.vx; it.y += it.vy; it.vy += 0.42; it.vx *= 0.985;
+      if(it.y >= GROUND - 12){
+        it.y = GROUND - 12; it.vy = -Math.abs(it.vy)*0.42; it.vx *= 0.55;
+        if(Math.abs(it.vy) < 1.2){ it.flying = false; it.vy = 0; it.vx = 0; }
+      }
+    }
+    // magnes — monety same wpadają do kieszeni, zbieranie jest satysfakcjonujące
+    const dm = p.x - it.x;
+    if(!it.taken && loose && Math.abs(dm) < 135){
+      it.x += Math.sign(dm) * Math.min(9, Math.abs(dm)*0.2);
+      if(it.y === undefined) it.y = GROUND - 12;
+      it.y += ((p.y - 62) - it.y) * 0.14;
+      it.flying = false;
+    }
+    if(!it.taken && Math.abs(p.x - it.x) < (loose ? 30 : 34) && (p.onGround || loose)){
       it.taken = true;
-      p.hp = Math.min(p.maxHp, p.hp + 45);
-      addPopup(it.x, GROUND - 60, '+45 HP 🌭', '#8bc34a');
-      beep(660, 0.1, 'square', 0.09); beep(880, 0.12, 'square', 0.09);
+      if(it.kind === 'weapon'){
+        const w = WEAPONS[it.w];
+        p.weapon = it.w; p.wUses = w.uses;
+        addPopup(it.x, GROUND - 66, w.icon + ' ' + w.name + '!', w.col);
+        addPopup(it.x, GROUND - 96, w.tip, '#e8ecff');
+        burst(it.x, GROUND - 40, w.col, 16);
+        beep(700,0.07,'square',0.09); beep(1050,0.09,'square',0.09); beep(1400,0.12,'square',0.08);
+      } else if(it.kind === 'coin'){
+        coins++; addScore(60);
+        addPopup(p.x, p.y - 96, '💰 +1', '#ffd43b');
+        burst(p.x, p.y - 60, '#ffd43b', 6);
+        beep(1250, 0.05, 'square', 0.06); beep(1700, 0.07, 'square', 0.05);
+      } else if(it.kind === 'medal'){
+        coins += 5; addScore(400);
+        addPopup(it.x, GROUND - 84, '🏅 AREA MEDAL  +400', '#ffd43b');
+        burst(it.x, GROUND - 46, '#ffd43b', 20); spawnConfetti(18);
+        [1046,1318,1568].forEach((f,i)=>setTimeout(()=>beep(f,0.15,'square',0.07), i*95));
+      } else {
+        p.hp = Math.min(p.maxHp, p.hp + 45);
+        addPopup(it.x, GROUND - 60, '+45 HP 🌭', '#8bc34a');
+        beep(660, 0.1, 'square', 0.09); beep(880, 0.12, 'square', 0.09);
+      }
     }
   }
   items = items.filter(it=>!it.taken);
 
-  if(enemies.every(e=>e.dead)){
-    wave++;
-    addScore(100, player.x, player.y - 130);
-    if(wave >= WAVES.length){ startWin(); }
-    else {
-      items.push({x: 120 + Math.random()*380, t: 0, taken: false});
-      spawnWave();
+  // ---- rytm planszy: idź → wejdź na arenę → wyczyść → zgarnij nagrodę → idź dalej ----
+  const area = AREAS[wave];
+  if(!area) return;
+  if(areaPhase === 'travel'){
+    if(p.x >= area.x0){
+      areaPhase = 'fight'; fightT = 0;
+      spawnArea();
+      showBanner(area.name, area.intro, '#ffd43b');
+      beep(150, 0.22, 'sawtooth', 0.09, 90); beep(300, 0.18, 'square', 0.05, -60);
+    }
+  } else if(areaPhase === 'fight'){
+    fightT += dt;
+    // posiłki: na placu naraz walczy najwyżej trójka, kolejni dobiegają w trakcie
+    if(spawnQueue.length){
+      spawnT += dt;
+      const aliveN = enemies.filter(e => !e.dead && !e.pooled).length;
+      if(aliveN < 3 && spawnT > 1.4){ spawnT = 0; spawnNextMob(); }
+    }
+    if(!spawnQueue.length && (enemies.length === 0 || enemies.every(e => e.dead))){
+      areaPhase = 'clear';
+      addScore(150, p.x, p.y - 140);
+      // pani Gosia liczy przewinienia przez megafon — dlatego finał nie spada z nieba
+      showBanner('AREA CLEAR — ' + area.name, area.clear, '#8bc34a', area.warn);
+      if(area.warn) setTimeout(()=>sndWhistle(), 500);
+      dropAreaReward(area);
+      sndWin();
+      if(area.boss) startWin();
+    }
+  } else if(areaPhase === 'clear'){
+    goArrowT += dt;
+    if(p.x > area.x1 + 30){
+      wave++;
+      goArrowT = 0;
+      areaPhase = wave >= AREAS.length ? 'done' : 'travel';
     }
   }
+}
+
+function showBanner(title, text, col, note){ banner = {title, text, col, note}; bannerT = 4.6; }
+
+// nagroda za wyczyszczenie terenu — medal, jedzenie, świeża broń i garść monet
+function dropAreaReward(area){
+  const cx = Math.min(WORLD_MAX_X - 90, area.x1 - 40);
+  items.push({kind:'medal',  x: cx,       t:0, taken:false});
+  items.push({kind:'hotdog', x: cx - 96,  t:0, taken:false});
+  items.push({kind:'weapon', w: WKEYS[wave % WKEYS.length], x: cx + 92, t:0, taken:false});
+  for(let i=0;i<3;i++) items.push({kind:'coin', x: cx + 140 + i*38, t:0, taken:false});
+  spawnConfetti(26);
+}
+
+// scenka zaczyna się od czystego stanu — żadnych zawieszonych błysków trafienia
+function clearFlashes(){
+  const all = [player].concat(enemies || []);
+  for(const f of all){ if(!f) continue; f.hurtT = 0; f.invuln = 0; f.frozen = 0; f.knockT = 0; f.spec = null; }
+  dmgVig = 0; trail = []; wfx = [];
 }
 
 function startLose(){
   state='lose';
   balls = [];
   sndLose();
-  if(!arek || arek.dead){
-    arek = mkFighter(POOL.x - 40, {color:'#0a0a0a', beltColor:'#c00', scale:1.75, speed:1.4, isArek:true, name:'MR AREK'});
+  clearFlashes();
+  // przegrana nad basenem = pełna scena z wrzuceniem do wody; wcześniej — Arek ciska Gregiem o deski
+  const atPool = player.x > POOL.x - 560;
+  if(!arek || arek.dead || Math.abs(arek.x - player.x) > 460){
+    arek = mkFighter(Math.min(WORLD_MAX_X, player.x + 160), {color:'#0a0a0a', beltColor:'#c00', scale:1.75, speed:1.4, isArek:true, name:'MR AREK'});
     enemies.push(arek);
   }
-  cut = {phase:'walk', t:0};
+  cut = {phase:'walk', t:0, atPool};
 }
 
 function updateLose(dt){
@@ -813,16 +1491,41 @@ function updateLose(dt){
   if(cut.phase==='walk'){
     const dx = p.x - a.x;
     a.facing = Math.sign(dx||1);
-    if(Math.abs(dx) > 30){ a.x += a.facing * 1.8; a.walkT += dt*8; a.pose='walk'; }
+    if(Math.abs(dx) > 30){ a.x += a.facing * 1.8; a.walkT += dt*7.5; a.pose='walk'; }
     else { cut.phase='lift'; cut.t=0; a.pose='idle'; }
   } else if(cut.phase==='lift'){
     p.carried = true;
     const k = Math.min(1, cut.t/0.8);
     p.x = a.x; p.y = GROUND - k * 95 * a.scale * 0.8;
     p.rot = k * Math.PI/2;
-    if(k>=1){ cut.phase='carry'; cut.t=0; }
+    if(k>=1){ cut.phase = cut.atPool ? 'carry' : 'slam'; cut.t=0; }
+  } else if(cut.phase==='slam'){
+    // daleko od basenu — Arek po prostu ciska Gregiem o deski
+    const k = Math.min(1, cut.t/0.32);
+    p.x = a.x + a.facing*14*k;
+    p.y = GROUND - (1-k)*95*a.scale*0.8;
+    p.rot = Math.PI/2;
+    a.pose = k < 1 ? 'slam' : 'idle';
+    if(cut.t > 0.32 && !cut.slammed){
+      cut.slammed = true; p.carried = false;
+      shake = Math.max(shake, 13); sndKick(); hitStop = Math.max(hitStop, 0.09);
+      for(let i=0;i<18;i++)
+        particles.push({x:p.x + (Math.random()-0.5)*30, y:GROUND, vx:(Math.random()-0.5)*7, vy:-Math.random()*4.5, life:0.6, color:'#e0cda8'});
+    }
+    if(cut.t > 1.0){ cut.phase='gloat'; cut.t=0; a.pose='idle'; }
+  } else if(cut.phase==='gloat'){
+    p.rot = Math.PI/2; p.y = GROUND; p.pose='ko'; p.carried = false;
+    a.facing = Math.sign(p.x - a.x || 1);
+    if(cut.t > 0.55 && !cut.crew){
+      cut.crew = [
+        mkFighter(a.x + 96,  {color:'#111',    beltColor:'#333', facing:-1, etype:'zbir'}),
+        mkFighter(a.x + 156, {color:'#26323e', beltColor:'#09f', scale:0.88, facing:-1, etype:'szybki'})
+      ];
+      enemies.push(...cut.crew);
+      beep(180, 0.3, 'sawtooth', 0.08, -60);
+    }
   } else if(cut.phase==='carry'){
-    a.facing = 1; a.x += 1.8; a.walkT += dt*8; a.pose='walk';
+    a.facing = 1; a.x += 1.8; a.walkT += dt*7.5; a.pose='walk';
     p.x = a.x; p.y = GROUND - 95*a.scale*0.8;
     if(a.x >= POOL.x - 30){ cut.phase='throw'; cut.t=0; a.pose='punch'; a.poseT=0;
       p.vx = 3.2; p.vy = -5; }
@@ -836,7 +1539,7 @@ function updateLose(dt){
       p.y = POOL.top + 34;
     }
   } else if(cut.phase==='sunk'){
-    // głowa Adama dryfuje w basenie; po chwili zbiry biorą się za Natalkę
+    // głowa Grega dryfuje w basenie; po chwili zbiry biorą się za Natalkę
     p.y = POOL.top + 34 + Math.sin(time*2)*3;
     if(cut.t > 1.1){
       cut.helpers = [
@@ -852,7 +1555,7 @@ function updateLose(dt){
     let done = true;
     cut.helpers.forEach((h,i)=>{
       const tx = targets[i];
-      if(Math.abs(h.x - tx) > 4){ h.x += Math.sign(tx - h.x)*2.2; h.walkT += dt*9; h.pose='walk'; done = false; }
+      if(Math.abs(h.x - tx) > 4){ h.x += Math.sign(tx - h.x)*2.2; h.walkT += dt*8; h.pose='walk'; done = false; }
       else h.pose='idle';
     });
     if(done){ cut.phase='girlLift'; cut.t=0; }
@@ -880,8 +1583,17 @@ function startWin(){
   state='win';
   balls = [];
   sndWin();
+  clearFlashes();
   girl.saved = false;
+  gosia = mkGosia(player.x - 500); // wchodzi zza lewej krawędzi kadru, nie z końca świata
   cut = {phase:'run', t:0};
+}
+
+const sndWhistle = ()=>{ beep(2300,0.16,'square',0.07,320); setTimeout(()=>beep(2500,0.22,'square',0.07,-260),170); };
+function sndZap(){
+  beep(70, 0.35, 'sawtooth', 0.13, 40);
+  beep(2600, 0.28, 'square', 0.06, -1800);
+  beep(1400, 0.3, 'sawtooth', 0.05, 900);
 }
 
 function updateWin(dt){
@@ -890,7 +1602,7 @@ function updateWin(dt){
   // fajerwerki!
   if(Math.random() < 0.06){
     const cols = ['#ff5252','#ffd43b','#7fd4ff','#ff5fa2','#8bc34a'];
-    burst(60 + Math.random()*(W-120), 70 + Math.random()*180, cols[Math.random()*cols.length|0], 26);
+    burst(p.x - 420 + Math.random()*840, 70 + Math.random()*180, cols[Math.random()*cols.length|0], 26);
     beep(900 + Math.random()*600, 0.14, 'sine', 0.035);
   }
   if(cut.phase==='run'){
@@ -907,7 +1619,7 @@ function updateWin(dt){
     p.pose='idle';
     if(cut.t > 1.1){ cut.phase='kneel'; cut.t=0; beep(523, 0.3, 'sine', 0.08); }
   } else if(cut.phase==='kneel'){
-    // Adam klęka i wyciąga pierścionek
+    // Greg klęka i wyciąga pierścionek
     p.pose='kneel'; p.facing = Math.sign(girl.x - p.x || 1);
     if(Math.random() < 0.22)
       particles.push({x:p.x + p.facing*24, y:GROUND-54, vx:(Math.random()-0.5)*1.4, vy:-Math.random()*1.4, life:0.5, color:'#fff176'});
@@ -921,15 +1633,98 @@ function updateWin(dt){
     p.pose='kneel';
     if(Math.random() < 0.35) spawnConfetti(3);
     if(Math.random() < 0.12) hearts.push({x:(p.x+girl.x)/2 + (Math.random()-0.5)*100, y:GROUND-110, life:1.5+Math.random()});
-    if(cut.t > 2.6){ cut.phase='end'; cut.t=0; }
-  } else {
-    p.pose='kneel';
+    if(cut.t > 2.6){
+      cut.phase='gosiaCome'; cut.t=0;
+      gosia.shown = true; gosia.x = p.x - 500; gosia.pose='walk'; gosia.facing = 1;
+      sndWhistle();
+    }
+  }
+  // ===== FINAŁ: wchodzi PANI GOSIA, kierowniczka basenu =====
+  else if(cut.phase==='gosiaCome'){
+    p.pose='idle';
+    gosia.walkT += dt*9; gosia.pose='walk';
+    gosia.x += 200*dt;
+    p.facing = Math.sign(gosia.x - p.x || -1);
+    if(cut.t > 0.9 && cut.t - dt <= 0.9) sndWhistle();
+    if(gosia.x > p.x - 96){ gosia.x = p.x - 96; cut.phase='gosiaWarn'; cut.t=0; gosia.pose='point'; }
+  } else if(cut.phase==='gosiaWarn'){
+    gosia.pose='point'; gosia.facing = 1;
+    p.pose='idle'; p.facing = -1;
+    if(cut.t > 1.8){
+      cut.phase='gosiaZap'; cut.t=0; gosia.pose='zap';
+      cut.baseX = p.x;
+      sndZap(); flashT = Math.max(flashT, 0.35); shake = Math.max(shake, 12);
+    }
+  } else if(cut.phase==='gosiaZap'){
+    gosia.pose='zap'; gosia.zapT += dt;
+    p.pose='zap';
+    p.x = cut.baseX + (Math.random()-0.5)*4;      // szarpie nim prąd
+    if(Math.random() < 0.55)
+      particles.push({x:p.x + (Math.random()-0.5)*36, y:GROUND-40-Math.random()*70,
+        vx:(Math.random()-0.5)*5, vy:-Math.random()*4, life:0.4, color: Math.random()<0.5 ? '#fff176' : '#9ad8ff'});
+    if(cut.t > 0.25 && cut.t - dt <= 0.25) addPopup(p.x, GROUND-165, '⚡ ZAAAP! ⚡', '#fff176');
+    if(Math.floor(cut.t*9) !== Math.floor((cut.t-dt)*9)) beep(1800+Math.random()*900, 0.05, 'square', 0.05, -600);
+    if(cut.t > 1.7){
+      cut.phase='gosiaKick'; cut.t=0; gosia.pose='kick'; gosia.kickT = 0;
+      p.x = cut.baseX;
+    }
+  } else if(cut.phase==='gosiaKick'){
+    gosia.pose='kick'; gosia.kickT += dt;
+    p.pose='hit';
+    if(cut.t > 0.24 && cut.t - dt <= 0.24){
+      // kopniak roboczy pani Gosi — lot po łuku prosto do basenu
+      sndKick(); shake = Math.max(shake, 14); hitStop = Math.max(hitStop, 0.1);
+      burst(p.x - 20, GROUND-50, '#fff176', 16);
+      addPopup(p.x, GROUND-180, '🦵 AND OUT! 🦵', '#c8ff5e');
+      const dist = Math.max(80, (POOL.x + 60) - p.x);
+      p.vy = -7.5; p.vx = Math.min(20, dist/38);
+      p.onGround = false; p.rot = 0;
+    }
+    if(cut.t > 0.5 && !p.onGround){ cut.phase='gosiaFly'; cut.t=0; }
+  } else if(cut.phase==='gosiaFly'){
+    gosia.pose='idle';
+    p.pose='hit';
+    p.x += p.vx; p.y += p.vy; p.vy += 0.4; p.rot += 0.3;
+    p.x = Math.min(p.x, POOL.x + POOL.w - 70);
+    if(p.y >= POOL.top + 30 && p.x > POOL.x){
+      cut.phase='gosiaSunk'; cut.t=0; p.rot = 0; cut.inPool = true;
+      sndSplash(); shake = Math.max(shake, 9);
+      for(let i=0;i<30;i++) splashes.push({x:p.x, y:POOL.top, vx:(Math.random()-0.5)*8, vy:-Math.random()*9-2, life:0.95});
+      p.y = POOL.top + 34;
+    } else if(p.x <= POOL.x && p.y >= GROUND){ // nie doleciał nad wodę — odbicie po deskach
+      p.y = GROUND; p.vy = -Math.abs(p.vy)*0.55; p.vx *= 0.92;
+      if(Math.abs(p.vy) < 1.6){ cut.phase='end'; cut.t=0; p.rot = 0; p.pose='ko'; }
+    }
+  } else if(cut.phase==='gosiaSunk'){
+    gosia.pose='idle'; gosia.facing = 1;
+    p.y = POOL.top + 34 + Math.sin(time*2)*3;
+    if(Math.random() < 0.08) hearts.push({x:girl.x + (Math.random()-0.5)*60, y:GROUND-120, life:1.4+Math.random()});
+    if(cut.t > 1.8){ cut.phase='end'; cut.t=0; }
+  } else { // 'end' — Greg moknie, Natalka ma pierścionek, pani Gosia ma spokój
+    gosia.pose='idle';
+    if(cut.inPool){ p.pose='ko'; p.y = POOL.top + 34 + Math.sin(time*2)*3; }
+    else p.pose='ko';
     if(Math.random() < 0.25) spawnConfetti(2);
-    if(Math.random() < 0.05) hearts.push({x:(p.x+girl.x)/2 + (Math.random()-0.5)*70, y:GROUND-110, life:1.5+Math.random()});
+    if(Math.random() < 0.05) hearts.push({x:girl.x + (Math.random()-0.5)*70, y:GROUND-110, life:1.5+Math.random()});
   }
 }
 
 // ---------- drawing ----------
+// pompon cheerleaderki — kłębek niebiesko-białych frędzli
+function drawPompom(x, y, s, t){
+  ctx.save(); ctx.translate(x, y);
+  const n = 11;
+  for(let i=0;i<n;i++){
+    const a = (i/n)*Math.PI*2 + Math.sin(t*6+i)*0.15;
+    const len = (7+Math.sin(t*9+i*2)*1.6)*s;
+    ctx.strokeStyle = i%2 ? '#eaf2ff' : '#2f74d8';
+    ctx.lineWidth = 2.4*s; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*len, Math.sin(a)*len); ctx.stroke();
+  }
+  ctx.fillStyle='#ffd43b'; ctx.beginPath(); ctx.arc(0,0,2.4*s,0,Math.PI*2); ctx.fill(); // uchwyt
+  ctx.restore();
+}
+
 function drawStick(f){
   const s = f.scale;
   ctx.save();
@@ -948,10 +1743,17 @@ function drawStick(f){
   if(f.rot) ctx.rotate(f.rot);
   if(f.pose==='ko' && !f.carried && state!=='lose'){ ctx.rotate(-Math.PI/2); ctx.translate(0, -8*s); }
   if(f.pose==='ko' && state==='lose' && f===player && cut && ['walk'].includes(cut.phase)){ ctx.rotate(-Math.PI/2); ctx.translate(0,-8*s); }
-  ctx.scale(f.facing, 1);
+  // płynny obrót: postać „przekręca się" przez profil zamiast skakać w lustrze
+  let fx0 = (f.faceX === undefined) ? f.facing : f.faceX;
+  // kopnięcie z obrotu: sylwetka spłaszcza się i przekręca — czytelny obrót o 360°
+  if(f.pose === 'spin'){
+    const sp2 = Math.cos(Math.min(1, f.poseT/0.42) * Math.PI*2);
+    fx0 *= (Math.abs(sp2) < 0.16 ? 0.16 : sp2);
+  }
+  ctx.scale(Math.abs(fx0) < 0.14 ? 0.14 * (fx0 < 0 ? -1 : 1) : fx0, 1);
   if(f.squash) ctx.scale(1 + f.squash*0.9, 1 - f.squash); // squash & stretch (środek w stopach)
   // linie pędu przy szybkim biegu
-  if(f===player && Math.abs(f.vx)>2.5 && f.onGround && state==='fight'){
+  if(f===player && (Math.abs(f.moveVx)>2.6 || Math.abs(f.vx)>2.5) && f.onGround && state==='fight'){
     ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=2; ctx.lineCap='round';
     for(let i=0;i<3;i++){
       const ly=-(18+i*17)*s;
@@ -973,9 +1775,18 @@ function drawStick(f){
   let armF={a:0.75+breathe*0.06,b:2.2}, armB={a:0.45+breathe*0.04,b:2.0}; // garda bokserska
   let legF={a:0.3,b:0.15}, legB={a:-0.3,b:0.15};
   let lean = 0, bob = breathe*1.3, atkK = 0;
-  if(f.pose==='walk'){ const sw=Math.sin(f.walkT); bob = Math.abs(Math.cos(f.walkT))*2.6;
-    legF={a:0.55*sw,b:0.35}; legB={a:-0.55*sw,b:0.35};
-    armF={a:-0.45*sw+0.35,b:1.5}; armB={a:0.45*sw-0.35,b:1.5}; }
+  if(f.pose==='walk'){
+    // chód przechodzi w bieg: dłuższy krok, mocniejszy wymach rąk, pochylenie do przodu
+    const spd = Math.min(1, Math.abs(f.moveVx || f.vx) / 3.1);
+    const sw = Math.sin(f.walkT), co = Math.cos(f.walkT);
+    bob = Math.abs(co) * (2.1 + 2.6*spd);
+    lean = 0.13 * spd;
+    const stride = 0.5 + 0.42*spd;
+    legF = {a: stride*sw,  b: 0.3 + 0.55*Math.max(0,  sw)};  // kolano zgina się w wymachu
+    legB = {a: -stride*sw, b: 0.3 + 0.55*Math.max(0, -sw)};
+    armF = {a: -(0.42 + 0.34*spd)*sw + 0.32, b: 1.55 - 0.45*spd};
+    armB = {a:  (0.42 + 0.34*spd)*sw - 0.32, b: 1.55 - 0.45*spd};
+  }
   if(f.pose==='punch'){ const k = t<0.1 ? t/0.1 : Math.max(0,1-(t-0.1)/0.14);
     armF={ext:k}; armB={a:0.5,b:2.3}; lean = 0.1*k; bob = 0; atkK = k;
     legF={a:0.45*k,b:0.2}; legB={a:-0.35*k,b:0.2}; }
@@ -996,14 +1807,58 @@ function drawStick(f){
     const rk = Math.max(0, 1-t/0.18);
     armF={ext:0.92 - rk*0.12}; armB={a:0.55,b:2.1}; lean = -0.05 - rk*0.05; bob = 0;
     legF={a:0.28,b:0.2}; legB={a:-0.3,b:0.2}; }
+  if(f.pose==='spray'){ // puszka gazu wyciągnięta przed siebie + lekki odrzut
+    const rk = Math.max(0, 1-t/0.2);
+    armF={ext:0.8 - rk*0.1}; armB={a:0.9,b:2.0}; lean = -0.04 - rk*0.05; bob = 0;
+    legF={a:0.3,b:0.2}; legB={a:-0.28,b:0.2}; }
+  if(f.pose==='cough'){ // zagazowany: dłonie przy twarzy, kuli się i słania
+    const w = Math.sin(f.walkT)*0.3;
+    armF={a:2.45+w,b:2.75}; armB={a:2.2-w,b:2.6};
+    lean = -0.16; bob = Math.abs(Math.sin(f.walkT))*2.2;
+    legF={a:0.2,b:0.3}; legB={a:-0.2,b:0.3}; }
+  if(f.pose==='upper'){ // podbródkowy — całe ciało wystrzela w górę za pięścią
+    const k = t<0.12 ? t/0.12 : Math.max(0, 1-(t-0.12)/0.2);
+    armF={a:2.9*k + 0.75*(1-k), b:2.95*k + 2.2*(1-k)}; armB={a:0.2,b:1.9};
+    legF={a:0.55*k,b:0.9*k}; legB={a:-0.35*k,b:0.5*k};
+    lean = -0.3*k; bob = -10*k; atkK = k; }
+  if(f.pose==='spin'){ // kopnięcie z obrotu — noga wyprostowana w poziomie
+    const k = Math.min(1, t/0.14);
+    legF={ext:1}; armF={a:1.35,b:0.35}; armB={a:-1.5,b:0.35};
+    lean = -0.12; bob = -3; atkK = Math.max(0, 1-(t-0.1)/0.3); }
+  if(f.pose==='sweep'){ // podcięcie — głęboki przysiad, noga nisko przy deskach
+    const k = t<0.1 ? t/0.1 : Math.max(0, 1-(t-0.1)/0.26);
+    bob = -22*k; lean = 0.3*k;
+    legF={a:-0.95*k, b:-0.75*k}; legB={a:0.75*k, b:1.5};
+    armF={a:0.1,b:1.1}; armB={a:1.4,b:2.4}; atkK = k*0.8; }
+  if(f.pose==='fly'){ // kopniak z wyskoku — obie nogi do przodu, ręce w tył
+    legF={ext:1}; legB={a:0.5,b:1.0};
+    armF={a:1.6,b:2.6}; armB={a:2.0,b:2.7};
+    lean = -0.32; bob = 0; atkK = 0.9; }
+  if(f.pose==='ready'){ // zapowiedź techniki — skulony, gotowy do wyskoku
+    const pu = 0.5 + 0.5*Math.sin(time*22);
+    bob = -4 - 3*pu; lean = 0.16;
+    legF={a:0.75,b:1.35}; legB={a:-0.5,b:1.25};
+    armF={a:0.95,b:2.6}; armB={a:0.8,b:2.5}; }
+  if(f.pose==='slamRun'){ // szarża barkiem — głowa nisko, ręce w tył
+    const sw = Math.sin(f.walkT*1.6);
+    lean = 0.42; bob = Math.abs(Math.cos(f.walkT))*2;
+    legF={a:0.75*sw,b:0.55}; legB={a:-0.75*sw,b:0.55};
+    armF={a:2.3,b:2.7}; armB={a:2.5,b:2.8}; }
+  if(f.pose==='zap'){ // porażenie prądem — ciało sztywne, ręce na boki, dygot
+    const j = Math.sin(time*55)*0.3;
+    armF={a:1.95+j,b:2.75}; armB={a:1.75-j,b:2.55};
+    legF={a:0.12,b:0.08}; legB={a:-0.12,b:0.08};
+    lean = j*0.12; bob = Math.sin(time*70)*2.2; }
   if(lean) ctx.rotate(lean);
   if(bob) ctx.translate(0, -bob);
 
   // ===== renderowanie ciała (wypełnione sylwetki) =====
-  const gi = (f===player || f.isAdam);
+  const gi = (f===player || f.isGreg);
+  const froz = f.frozen > 0;
   const hurtFlash = f.hurtT>0 && Math.floor(time*20)%2===0;
-  const bodyCol  = hurtFlash ? '#ff6b6b' : f.color;
-  const limbCol  = gi ? (hurtFlash?'#ffc4c4':'#e9e9e9') : bodyCol;
+  const zapFlash = f.pose==='zap' && Math.floor(time*26)%2===0;
+  const bodyCol  = hurtFlash ? '#ff6b6b' : (froz ? '#8fd8ff' : (zapFlash ? '#fff8c4' : f.color));
+  const limbCol  = gi ? (hurtFlash?'#ffc4c4':(zapFlash?'#fffbe0':'#e9e9e9')) : bodyCol;
   const skin = '#ffcfa0';
   ctx.lineCap='round'; ctx.lineJoin='round';
 
@@ -1029,7 +1884,8 @@ function drawStick(f){
   [footB,footF].forEach(ft=>{ if(ft){ ctx.save(); ctx.translate(ft.hx,ft.hy); ctx.beginPath(); ctx.ellipse(3*s,1*s,6*s,3.4*s,0,0,Math.PI*2); ctx.fill(); ctx.restore(); } });
 
   // --- TUŁÓW (wypełniony, barki szersze niż biodra) ---
-  ctx.fillStyle = gi ? (hurtFlash?'#ffd6d6':'#f7f7f7') : bodyCol;
+  ctx.fillStyle = f.cheer ? (hurtFlash?'#ff8aa0':(zapFlash?'#bfe4ff':'#2f74d8'))
+                : gi ? (hurtFlash?'#ffd6d6':(zapFlash?'#fffbe0':'#f7f7f7')) : bodyCol;
   ctx.beginPath();
   ctx.moveTo(-hipW, hip.y);
   ctx.lineTo(-shW, sh.y+3*s);
@@ -1042,7 +1898,13 @@ function drawStick(f){
   ctx.save(); ctx.clip();
   ctx.fillStyle='rgba(0,0,0,0.16)'; ctx.fillRect(2*s, sh.y-8*s, shW+6*s, 46*s);
   ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(-shW-6*s, sh.y-8*s, 6*s, 46*s);
-  if(gi){ ctx.strokeStyle='rgba(0,0,0,.16)'; ctx.lineWidth=1.6*s;
+  if(f.cheer){
+    // biały kołnierzyk „V" + pas ozdobny na topie cheerleaderki
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.moveTo(-shW*0.75, sh.y+2*s); ctx.lineTo(0, sh.y+11*s); ctx.lineTo(shW*0.75, sh.y+2*s);
+    ctx.lineTo(shW*0.5, sh.y+5*s); ctx.lineTo(0, sh.y+8*s); ctx.lineTo(-shW*0.5, sh.y+5*s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#ffd43b'; ctx.fillRect(-shW, hip.y-6*s, shW*2, 3*s); // złoty pasek
+  } else if(gi){ ctx.strokeStyle='rgba(0,0,0,.16)'; ctx.lineWidth=1.6*s;
     ctx.beginPath(); ctx.moveTo(1*s,sh.y-2*s); ctx.lineTo(-3*s,hip.y+4*s); ctx.stroke(); }
   ctx.restore();
   // rim light na krawędzi tułowia (lewa krawędź od słońca)
@@ -1051,8 +1913,19 @@ function drawStick(f){
   ctx.moveTo(-hipW+1*s, hip.y); ctx.lineTo(-shW+1*s, sh.y+3*s);
   ctx.quadraticCurveTo(0, sh.y-3*s, shW*0.2, sh.y-3.5*s); ctx.stroke();
 
-  // --- PAS ---
-  if(f.beltColor){
+  // --- PAS / SPÓDNICZKA ---
+  if(f.cheer){
+    // plisowana spódniczka cheerleaderki (wachlarz niebiesko-białych klinów)
+    const sw0 = hipW*1.7, sy = hip.y-1*s, slen = 20*s, pl = 7;
+    for(let i=0;i<pl;i++){
+      const x0 = -sw0 + (i/pl)*sw0*2, x1 = -sw0 + ((i+1)/pl)*sw0*2;
+      ctx.fillStyle = i%2 ? '#eaf2ff' : '#2f74d8';
+      ctx.beginPath(); ctx.moveTo(x0, sy); ctx.lineTo(x1, sy);
+      ctx.lineTo((x1)*1.12, sy+slen); ctx.lineTo((x0)*1.12, sy+slen); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle='rgba(0,0,0,.14)'; ctx.fillRect(-sw0, sy+slen-2*s, sw0*2*1.12, 2*s);
+    ctx.fillStyle='#ffd43b'; ctx.fillRect(-sw0, sy-1*s, sw0*2, 2.4*s); // pasek w talii
+  } else if(f.beltColor){
     ctx.fillStyle=f.beltColor;
     ctx.fillRect(-hipW-1.5*s, hip.y-3.5*s, (hipW+1.5*s)*2, 6*s);
     ctx.fillRect(-2.5*s, hip.y-2*s, 5*s, 12*s); // węzeł
@@ -1064,9 +1937,10 @@ function drawStick(f){
   const handB = twoSeg(sh.x,sh.y,1.57-armB.a,aL,1.57-armB.b,aL,armW);
   ctx.fillStyle = gi ? skin : (f.isArek?'#2a0000':'#1a1a1a');
   ctx.beginPath(); ctx.arc(handB.hx,handB.hy,(f.isArek?5.5:4.4)*s,0,Math.PI*2); ctx.fill();
+  if(f.cheer) drawPompom(handB.hx, handB.hy, s, time + f.x*0.03);
 
   // --- GŁOWA ---
-  ctx.fillStyle = gi ? skin : bodyCol;
+  ctx.fillStyle = gi ? (zapFlash ? '#fff3b0' : skin) : bodyCol;
   ctx.beginPath(); ctx.arc(0, headY, headR, 0, Math.PI*2); ctx.fill();
   // miękkie rozjaśnienie od słońca (lewa-góra)
   const hl = ctx.createRadialGradient(-headR*0.4, headY-headR*0.4, 0, -headR*0.4, headY-headR*0.4, headR*1.3);
@@ -1078,26 +1952,40 @@ function drawStick(f){
   ctx.beginPath(); ctx.arc(0, headY, headR-0.5*s, Math.PI*0.75, Math.PI*1.75); ctx.stroke();
 
   if(gi){
-    // twarz Adama — zdeterminowane oczy + brew + opaska z powiewającą wstążką
+    // twarz Grega — zdeterminowane oczy + brew + opaska z powiewającą wstążką
     ctx.fillStyle='#233';
     ctx.beginPath(); ctx.arc(3.5*s, headY, 1.6*s, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(8*s, headY, 1.6*s, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle='#233'; ctx.lineWidth=1.3*s; ctx.beginPath();
     ctx.moveTo(2*s,headY-3*s); ctx.lineTo(9.5*s,headY-3.2*s); ctx.stroke(); // brew
-    ctx.beginPath(); ctx.moveTo(3*s,headY+4.5*s); ctx.lineTo(8*s,headY+4.5*s); ctx.stroke(); // usta
-    // opaska
-    const band = hurtFlash?'#ff8a8a':'#e11';
-    ctx.strokeStyle=band; ctx.lineWidth=3.4*s;
-    ctx.beginPath(); ctx.arc(0, headY, headR+0.2*s, Math.PI*1.06, Math.PI*1.94); ctx.stroke();
-    const fl = Math.sin(time*7+f.x*0.02)*4*s;
-    ctx.lineWidth=3*s; ctx.beginPath();
-    ctx.moveTo(-headR+1*s, headY-3*s);
-    ctx.quadraticCurveTo(-headR-9*s, headY-1*s+fl, -headR-15*s, headY+4*s+fl*1.5);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-headR+1*s, headY-1*s);
-    ctx.quadraticCurveTo(-headR-8*s, headY+3*s-fl, -headR-13*s, headY+8*s-fl);
-    ctx.stroke();
+    // usta — cheerleader uśmiechnięty, inaczej zdeterminowany
+    if(f.cheer){ ctx.beginPath(); ctx.arc(5.5*s, headY+3.5*s, 2.6*s, 0.1*Math.PI, 0.9*Math.PI); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.moveTo(3*s,headY+4.5*s); ctx.lineTo(8*s,headY+4.5*s); ctx.stroke(); }
+    if(f.cheer){
+      // KOKARDKA cheerleaderki na czubku głowy
+      const bx = -1*s, by = headY - headR - 1.5*s, bob2 = Math.sin(time*6+f.x*0.02)*0.12;
+      ctx.save(); ctx.translate(bx, by); ctx.rotate(bob2);
+      ctx.fillStyle = hurtFlash?'#ff8aa0':'#ff3d7f';
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(-9*s,-6*s,-9*s,0); ctx.quadraticCurveTo(-9*s,6*s,0,0); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(9*s,-6*s,9*s,0); ctx.quadraticCurveTo(9*s,6*s,0,0); ctx.fill();
+      ctx.fillStyle='#ffd43b'; ctx.beginPath(); ctx.arc(0,0,2.6*s,0,Math.PI*2); ctx.fill(); // guzik
+      ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.ellipse(-5*s,-1.5*s,3*s,1.4*s,0.4,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    } else {
+      // opaska karate
+      const band = hurtFlash?'#ff8a8a':'#e11';
+      ctx.strokeStyle=band; ctx.lineWidth=3.4*s;
+      ctx.beginPath(); ctx.arc(0, headY, headR+0.2*s, Math.PI*1.06, Math.PI*1.94); ctx.stroke();
+      const fl = Math.sin(time*7+f.x*0.02)*4*s;
+      ctx.lineWidth=3*s; ctx.beginPath();
+      ctx.moveTo(-headR+1*s, headY-3*s);
+      ctx.quadraticCurveTo(-headR-9*s, headY-1*s+fl, -headR-15*s, headY+4*s+fl*1.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-headR+1*s, headY-1*s);
+      ctx.quadraticCurveTo(-headR-8*s, headY+3*s-fl, -headR-13*s, headY+8*s-fl);
+      ctx.stroke();
+    }
   } else {
     // wrogowie — wściekłe świecące oczy + kolorowa opaska
     const eyeCol = f.isArek ? '#ff2020' : '#ffdd33';
@@ -1127,6 +2015,27 @@ function drawStick(f){
       ctx.fillStyle=f.beltColor||'#0aa';
       ctx.fillRect(-headR, headY-2*s, headR*2, 3.5*s);
       ctx.beginPath(); ctx.moveTo(headR, headY-1*s); ctx.lineTo(headR+8*s, headY+1*s); ctx.lineTo(headR, headY+2.5*s); ctx.closePath(); ctx.fill();
+    } else if(f.etype==='ratownik'){ // czerwona czapka ratownika + gwizdek na szyi
+      ctx.fillStyle='#ff5252';
+      ctx.beginPath(); ctx.arc(0, headY-headR+3.5*s, headR*0.98, Math.PI, Math.PI*2); ctx.fill();
+      ctx.fillRect(-headR*0.98, headY-headR+2.6*s, headR*1.96, 2.6*s);
+      ctx.beginPath(); ctx.moveTo(headR*0.6, headY-headR+3*s); ctx.lineTo(headR+9*s, headY-headR+5.5*s); ctx.lineTo(headR*0.6, headY-headR+6.5*s); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#fff'; // krzyżyk ratowniczy
+      ctx.fillRect(-1.2*s, headY-headR-1.5*s, 2.4*s, 6*s);
+      ctx.fillRect(-3.6*s, headY-headR+0.9*s, 7.2*s, 2.4*s);
+      ctx.strokeStyle='#ffd43b'; ctx.lineWidth=1.6*s; // gwizdek
+      ctx.beginPath(); ctx.moveTo(-4*s, headY+8*s); ctx.quadraticCurveTo(0, headY+16*s, 4*s, headY+8*s); ctx.stroke();
+    } else if(f.etype==='ochroniarz'){ // łysy kark, okulary i słuchawka
+      ctx.fillStyle='rgba(255,255,255,.16)'; // połysk łysiny
+      ctx.beginPath(); ctx.arc(-2*s, headY-headR*0.45, headR*0.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#0b0b16'; // ciemne okulary
+      rr(-headR-0.5*s, headY-2.4*s, headR*2+1*s, 5.4*s, 1.6*s); ctx.fill();
+      ctx.fillStyle=f.beltColor||'#7fd4ff';
+      ctx.fillRect(-headR-0.5*s, headY-0.4*s, headR*2+1*s, 1*s);
+      ctx.fillStyle='#d8dee8'; // słuchawka + spiralny kabel
+      ctx.beginPath(); ctx.arc(-headR+1*s, headY+1*s, 2.4*s, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#d8dee8'; ctx.lineWidth=1.3*s;
+      ctx.beginPath(); ctx.moveTo(-headR+1*s, headY+3*s); ctx.quadraticCurveTo(-headR-3*s, headY+13*s, -6*s, headY+20*s); ctx.stroke();
     }
   }
 
@@ -1151,29 +2060,24 @@ function drawStick(f){
     ctx.fillStyle='rgba(255,255,255,.5)';
     ctx.beginPath(); ctx.arc(handF.hx+4*s,handF.hy,3*s,0,Math.PI*2); ctx.fill();
   }
-  // WODNY BLASTER Adama (super soaker) — trzymany w przedniej ręce
-  if(gi && f.pose!=='kneel' && f.pose!=='slam'){
+  // PUSZKA GAZU ŁZAWIĄCEGO — jedyna broń Grega, trzymana w przedniej ręce
+  if(gi && !['kneel','slam','zap'].includes(f.pose)){
     ctx.save(); ctx.translate(handF.hx, handF.hy);
-    const aim = f.pose==='shoot' ? -0.05 : 0.15; ctx.rotate(aim);
+    const aim = f.pose==='spray' ? -0.12 : 0.1; ctx.rotate(aim);
     const u = s;
-    // korpus
-    ctx.fillStyle='#12b5e6'; rr(-3*u,-3.2*u,17*u,7*u,2.5*u); ctx.fill();
-    ctx.fillStyle='#0a90bd'; rr(-3*u,0.4*u,17*u,3.4*u,2*u); ctx.fill();
-    // zbiornik na wodę u góry
-    ctx.fillStyle='rgba(120,220,255,0.85)'; rr(1*u,-8.5*u,10*u,5.5*u,2.2*u); ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.5)'; rr(2.5*u,-8*u,4*u,2*u,1*u); ctx.fill();
-    // dysza
-    ctx.fillStyle='#ffb703'; rr(13*u,-1.6*u,6*u,3.4*u,1.2*u); ctx.fill();
-    ctx.fillStyle='#0a3f52'; ctx.beginPath(); ctx.arc(19*u,0.1*u,1.7*u,0,Math.PI*2); ctx.fill();
-    // rączka + spust
-    ctx.fillStyle='#ff7043'; rr(-1*u,2.6*u,4.5*u,6*u,1.5*u); ctx.fill();
-    // obrys
-    ctx.strokeStyle='rgba(0,40,60,0.35)'; ctx.lineWidth=1*u;
-    rr(-3*u,-3.2*u,17*u,7*u,2.5*u); ctx.stroke();
-    if(f.pose==='shoot'){ // rozbłysk z lufy
-      const mk = Math.max(0,1-f.poseT/0.16);
-      ctx.fillStyle='rgba(180,235,255,'+(0.8*mk).toFixed(2)+')';
-      ctx.beginPath(); ctx.arc(21*u,0.1*u,(2+mk*3)*u,0,Math.PI*2); ctx.fill();
+    // puszka (pionowy walec)
+    ctx.fillStyle='#c0392b'; rr(-3*u,-11*u,7*u,13*u,2*u); ctx.fill();
+    ctx.fillStyle='#e05a4a'; rr(-3*u,-11*u,2.6*u,13*u,2*u); ctx.fill(); // połysk
+    ctx.fillStyle='#fff'; rr(-3*u,-5*u,7*u,3.4*u,0.5*u); ctx.fill();    // etykieta
+    ctx.fillStyle='#c0392b'; ctx.font='bold '+(3*u)+'px Arial'; ctx.textAlign='center'; ctx.fillText('GAS', 0.4*u, -2.4*u);
+    // kołpak rozpylacza
+    ctx.fillStyle='#222'; rr(-2.4*u,-14.5*u,6*u,4*u,1.2*u); ctx.fill();
+    ctx.fillStyle='#444'; rr(2.4*u,-13.6*u,3.4*u,2.2*u,1*u); ctx.fill(); // dysza wylot
+    ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1*u; rr(-3*u,-11*u,7*u,13*u,2*u); ctx.stroke();
+    if(f.pose==='spray'){ // obłoczek przy dyszy
+      const mk = Math.max(0,1-f.poseT/0.2);
+      ctx.fillStyle='rgba(206,224,140,'+(0.6*mk).toFixed(2)+')';
+      ctx.beginPath(); ctx.arc(9*u,-12.4*u,(3+mk*4)*u,0,Math.PI*2); ctx.fill();
     }
     ctx.restore();
   }
@@ -1188,6 +2092,43 @@ function drawStick(f){
     ctx.moveTo(handF.hx+2*s-5*s, handF.hy-12*s); ctx.lineTo(handF.hx+2*s+5*s, handF.hy-12*s);
     ctx.moveTo(handF.hx+2*s, handF.hy-17*s); ctx.lineTo(handF.hx+2*s, handF.hy-7*s);
     ctx.stroke();
+  }
+
+  // --- PORAŻENIE PRĄDEM: aureola wyładowań + kreskówkowy prześwit szkieletu ---
+  if(f.pose==='zap'){
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(180,225,255,0.85)'; ctx.lineCap='round';
+    for(let i=0;i<5;i++){
+      const ry = headY + 12*s + i*13*s, rr2 = (16 + Math.sin(time*30+i)*4) * s;
+      ctx.lineWidth = 2*s;
+      ctx.beginPath();
+      for(let k=0;k<=10;k++){
+        const ang = k/10*Math.PI*2;
+        const rad = rr2 + (Math.random()-0.5)*5*s;
+        const px = Math.cos(ang)*rad, py = ry + Math.sin(ang)*rad*0.35;
+        k===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    if(zapFlash){ // klatka prześwitu — czaszka i żebra
+      ctx.save();
+      ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.strokeStyle='rgba(255,255,255,0.92)';
+      ctx.beginPath(); ctx.arc(0, headY, headR*0.86, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#2b2b3a';
+      ctx.beginPath(); ctx.arc(-3.2*s, headY-0.5*s, 2.4*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(3.2*s, headY-0.5*s, 2.4*s, 0, Math.PI*2); ctx.fill();
+      ctx.fillRect(-1*s, headY+4*s, 2*s, 3*s);
+      ctx.strokeStyle='rgba(255,255,255,0.92)'; ctx.lineWidth=2.6*s; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(0, sh.y-2*s); ctx.lineTo(0, hip.y+2*s); ctx.stroke(); // kręgosłup
+      ctx.lineWidth=2.1*s;
+      for(let i=0;i<4;i++){
+        const ry = sh.y + 3*s + i*7*s;
+        ctx.beginPath(); ctx.moveTo(-8.5*s, ry+2*s); ctx.quadraticCurveTo(0, ry-2.5*s, 8.5*s, ry+2*s); ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   ctx.restore();
@@ -1209,6 +2150,204 @@ function drawStick(f){
     ctx.fillStyle = f.isArek ? '#ff5252' : (f===player ? '#fff' : '#ffd43b');
     ctx.fillText(f.name, f.x, ny);
   }
+}
+
+// ---------- broń w dłoni gracza ----------
+function drawWeaponInHand(f, handF, s){
+  const u = s, key = f.weapon;
+  ctx.save();
+  ctx.translate(handF.hx, handF.hy);
+  const swing = (f.pose==='punch' || f.pose==='kick') ? -0.55*Math.max(0, 1 - f.poseT/0.22) : 0.12;
+  ctx.rotate(swing);
+  if(key === 'noodle'){                      // makaron basenowy — długa, miękka rura
+    const L = 62*u, R = 5.6*u;
+    const cols = ['#ff5fa2','#7fd4ff','#fff176','#8bc34a'];
+    for(let i=0;i<4;i++){
+      ctx.fillStyle = cols[i];
+      rr(-8*u + i*(L/4), -R, L/4 + 0.6*u, R*2, R*0.8); ctx.fill();
+    }
+    ctx.fillStyle='rgba(255,255,255,.35)'; rr(-7*u, -R*0.75, L-2*u, R*0.55, R*0.3); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=1*u; rr(-8*u, -R, L, R*2, R*0.8); ctx.stroke();
+  } else if(key === 'umbrella'){             // parasol plażowy — trzonek + czasza
+    ctx.strokeStyle='#c9a227'; ctx.lineWidth=3.2*u; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(-6*u, 2*u); ctx.lineTo(34*u, -22*u); ctx.stroke();
+    ctx.save(); ctx.translate(34*u, -22*u); ctx.rotate(-0.6);
+    const cols=['#ff9c00','#fff','#ff5252','#fff','#ff9c00','#fff'];
+    for(let i=0;i<6;i++){
+      ctx.fillStyle=cols[i];
+      ctx.beginPath(); ctx.moveTo(0,0);
+      ctx.arc(0,0,22*u, Math.PI + i*(Math.PI/6), Math.PI + (i+1)*(Math.PI/6));
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle='rgba(0,0,0,.22)'; ctx.lineWidth=1.2*u;
+    ctx.beginPath(); ctx.arc(0,0,22*u, Math.PI, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  } else if(key === 'flipflop'){             // klapek — podeszwa z paskiem
+    ctx.fillStyle='#8bc34a';
+    ctx.beginPath(); ctx.ellipse(9*u, 0, 13*u, 6*u, 0.12, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#5f8f28';
+    ctx.beginPath(); ctx.ellipse(9*u, 1.6*u, 13*u, 4.4*u, 0.12, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#ff5252'; ctx.lineWidth=2.4*u; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(2*u,-3*u); ctx.lineTo(12*u,-1*u); ctx.lineTo(17*u,-4*u); ctx.stroke();
+  } else if(key === 'bucket'){               // wiaderko z lodem
+    ctx.fillStyle='#7fd4ff';
+    ctx.beginPath(); ctx.moveTo(2*u,-2*u); ctx.lineTo(24*u,-2*u); ctx.lineTo(20*u,16*u); ctx.lineTo(6*u,16*u); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#4fa8d8'; rr(1*u,-5*u,24*u,4*u,2*u); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.85)';
+    [[7,-9,4],[13,-11,5],[19,-8,4]].forEach(c=>{
+      rr(c[0]*u, c[1]*u, c[2]*u, c[2]*u, 1.2*u); ctx.fill();
+    });
+    ctx.strokeStyle='rgba(0,60,90,.35)'; ctx.lineWidth=1.1*u;
+    ctx.beginPath(); ctx.moveTo(2*u,-2*u); ctx.lineTo(24*u,-2*u); ctx.lineTo(20*u,16*u); ctx.lineTo(6*u,16*u); ctx.closePath(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------- błyskawica (packa pani Gosi) ----------
+function drawLightning(x1, y1, x2, y2, seg, amp, col, w){
+  ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath(); ctx.moveTo(x1, y1);
+  for(let i=1;i<seg;i++){
+    const k = i/seg;
+    ctx.lineTo(x1 + (x2-x1)*k + (Math.random()-0.5)*amp, y1 + (y2-y1)*k + (Math.random()-0.5)*amp);
+  }
+  ctx.lineTo(x2, y2); ctx.stroke();
+}
+
+// ---------- PANI GOSIA — kierowniczka basenu, gwizdek i packa elektryczna ----------
+function drawGosia(){
+  const g = gosia;
+  if(!g || !g.shown) return;
+  const s = 1.2;
+  const headY = -80*s, headR = 10*s;
+  const skin = '#f6c9a0', uni = '#123a63', hair = '#b9bec9';
+  const kk = g.pose==='kick' ? Math.min(1, Math.max(0, (g.kickT - 0.06)/0.16)) : 0;
+  const zapping = g.pose==='zap';
+
+  // cień
+  ctx.save(); ctx.globalAlpha=0.26; ctx.fillStyle='#000';
+  ctx.beginPath(); ctx.ellipse(g.x, GROUND+2, 21*s, 5.5*s, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+
+  ctx.save();
+  ctx.translate(g.x, g.y);
+  ctx.scale(g.facing, 1);
+  const bob = g.pose==='walk' ? Math.abs(Math.cos(g.walkT))*2.4 : Math.sin(time*2.6)*1.2;
+  ctx.translate(0, -bob);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+
+  // NOGI (białe adidasy kierowniczki)
+  ctx.strokeStyle = skin; ctx.lineWidth = 6.4*s;
+  const sw = g.pose==='walk' ? Math.sin(g.walkT)*9*s : 0;
+  ctx.beginPath(); ctx.moveTo(-3*s,-34*s); ctx.lineTo(-4*s - sw, -2*s); ctx.stroke();
+  if(kk > 0){ // noga robocza w kopniaku — prosto do przodu
+    ctx.beginPath(); ctx.moveTo(3*s,-34*s); ctx.lineTo(20*s*kk + 4*s, -34*s - 6*s*kk); ctx.stroke();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.ellipse(22*s*kk + 6*s, -34*s - 6*s*kk, 6*s, 4*s, 0.2, 0, Math.PI*2); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.moveTo(3*s,-34*s); ctx.lineTo(4*s + sw, -2*s); ctx.stroke();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.ellipse(4*s + sw, -1*s, 6.5*s, 3.6*s, 0, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.ellipse(-4*s - sw, -1*s, 6.5*s, 3.6*s, 0, 0, Math.PI*2); ctx.fill();
+
+  // SZORTY SŁUŻBOWE
+  ctx.fillStyle='#0c2745';
+  ctx.beginPath();
+  ctx.moveTo(-10*s,-46*s); ctx.lineTo(10*s,-46*s); ctx.lineTo(9*s,-31*s); ctx.lineTo(-9*s,-31*s); ctx.closePath(); ctx.fill();
+
+  // POLO Z NAPISEM STAFF
+  ctx.fillStyle = uni;
+  ctx.beginPath();
+  ctx.moveTo(-11*s,-44*s); ctx.lineTo(-13*s,-66*s);
+  ctx.quadraticCurveTo(0,-71*s, 13*s,-66*s);
+  ctx.lineTo(11*s,-44*s); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(2*s,-70*s,14*s,30*s);
+  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='700 '+(6*s)+'px Arial'; ctx.textAlign='center';
+  ctx.fillText('STAFF', 0, -54*s);
+  ctx.restore();
+  // kołnierzyk
+  ctx.fillStyle='#e8eef7';
+  ctx.beginPath(); ctx.moveTo(-6*s,-66*s); ctx.lineTo(0,-60*s); ctx.lineTo(6*s,-66*s); ctx.closePath(); ctx.fill();
+
+  // GWIZDEK NA CZERWONYM SZNURKU
+  ctx.strokeStyle='#e63946'; ctx.lineWidth=1.8*s;
+  ctx.beginPath(); ctx.moveTo(-5*s,-64*s); ctx.quadraticCurveTo(0,-52*s, 5*s,-64*s); ctx.stroke();
+  ctx.fillStyle='#ffd43b';
+  rr(-2.5*s,-54*s,7*s,4*s,1.6*s); ctx.fill();
+
+  // RĘKA TYLNA (na biodrze — poza kierowniczej)
+  ctx.strokeStyle = skin; ctx.lineWidth = 5*s;
+  ctx.beginPath(); ctx.moveTo(-9*s,-63*s); ctx.lineTo(-15*s,-54*s); ctx.lineTo(-9*s,-46*s); ctx.stroke();
+
+  // RĘKA PRZEDNIA + PACKA ELEKTRYCZNA
+  let hx, hy;
+  if(zapping){       hx = 26*s; hy = -86*s; }
+  else if(g.pose==='point'){ hx = 30*s; hy = -68*s; }
+  else if(kk > 0){   hx = 16*s; hy = -74*s; }
+  else {             hx = 18*s; hy = -52*s; }
+  ctx.strokeStyle = skin; ctx.lineWidth = 5*s;
+  ctx.beginPath(); ctx.moveTo(9*s,-63*s); ctx.lineTo((9*s+hx)/2 + 3*s, (-63*s+hy)/2); ctx.lineTo(hx, hy); ctx.stroke();
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(hx, hy, 3.6*s, 0, Math.PI*2); ctx.fill();
+
+  if(g.pose === 'point'){
+    // wyprostowany palec oskarżycielski
+    ctx.strokeStyle = skin; ctx.lineWidth = 3.2*s;
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 9*s, hy - 1*s); ctx.stroke();
+  } else {
+    // PACKA ELEKTRYCZNA — rakietka z siatką pod napięciem
+    ctx.save(); ctx.translate(hx, hy); ctx.rotate(zapping ? -0.5 : 0.25);
+    ctx.strokeStyle='#2b2b3a'; ctx.lineWidth=3*s;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(11*s,-3*s); ctx.stroke();
+    ctx.fillStyle='#ffd43b';
+    rr(10*s,-16*s,20*s,26*s,4*s); ctx.fill();
+    ctx.fillStyle = zapping ? 'rgba(180,235,255,0.95)' : 'rgba(150,215,255,0.55)';
+    rr(13*s,-13*s,14*s,20*s,2.5*s); ctx.fill();
+    ctx.strokeStyle = zapping ? 'rgba(255,255,255,.95)' : 'rgba(40,90,120,.5)'; ctx.lineWidth=0.9*s;
+    for(let i=0;i<5;i++){ ctx.beginPath(); ctx.moveTo(13*s+i*3.5*s,-13*s); ctx.lineTo(13*s+i*3.5*s, 7*s); ctx.stroke(); }
+    for(let i=0;i<6;i++){ ctx.beginPath(); ctx.moveTo(13*s,-13*s+i*3.4*s); ctx.lineTo(27*s,-13*s+i*3.4*s); ctx.stroke(); }
+    ctx.strokeStyle='rgba(0,0,0,.3)'; ctx.lineWidth=1.2*s; rr(10*s,-16*s,20*s,26*s,4*s); ctx.stroke();
+    if(zapping){ // iskry na siatce
+      ctx.save(); ctx.globalCompositeOperation='lighter';
+      for(let i=0;i<4;i++)
+        drawLightning(14*s+Math.random()*12*s, -12*s, 14*s+Math.random()*12*s, 6*s, 4, 5*s, 'rgba(200,240,255,0.95)', 1.4*s);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // GŁOWA
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, headY, headR, 0, Math.PI*2); ctx.fill();
+  // siwe włosy + kok
+  ctx.fillStyle = hair;
+  ctx.beginPath(); ctx.arc(0, headY-2*s, headR+2.4*s, Math.PI*0.9, Math.PI*2.1); ctx.fill();
+  ctx.beginPath(); ctx.arc(-headR-2*s, headY-8*s, 6.5*s, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.3)';
+  ctx.beginPath(); ctx.arc(-3*s, headY-7*s, 4*s, Math.PI, Math.PI*2); ctx.fill();
+  // OKULARY W PROSTOKĄTNEJ OPRAWCE
+  ctx.strokeStyle='#2b2b3a'; ctx.lineWidth=1.8*s;
+  ctx.fillStyle='rgba(210,235,255,.55)';
+  rr(-8.5*s, headY-1.5*s, 7*s, 5.6*s, 1.2*s); ctx.fill(); ctx.stroke();
+  rr(1.5*s, headY-1.5*s, 7*s, 5.6*s, 1.2*s); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-1.5*s, headY+1.2*s); ctx.lineTo(1.5*s, headY+1.2*s); ctx.stroke();
+  // surowe brwi + zacięte usta
+  ctx.strokeStyle='#6b6f7a'; ctx.lineWidth=2*s;
+  ctx.beginPath(); ctx.moveTo(-9*s, headY-5*s); ctx.lineTo(-2.5*s, headY-3.2*s); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(2.5*s, headY-3.2*s); ctx.lineTo(9*s, headY-5*s); ctx.stroke();
+  ctx.strokeStyle='#b1495a'; ctx.lineWidth=2*s;
+  if(zapping || g.pose==='point' || kk>0){ // krzyk
+    ctx.fillStyle='#8e2b3a';
+    ctx.beginPath(); ctx.ellipse(0, headY+6.5*s, 3.2*s, 3.8*s, 0, 0, Math.PI*2); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.moveTo(-3.5*s, headY+6.5*s); ctx.lineTo(3.5*s, headY+6.5*s); ctx.stroke();
+  }
+  ctx.restore();
+
+  // tabliczka wyżej niż u Grega — stoją blisko siebie, imiona nie mogą na siebie wchodzić
+  nameTag('PANI GOSIA', g.x, g.y - 186 - bob, '#c8ff5e');
 }
 
 function rr(x, y, w, h, r){
@@ -1263,7 +2402,7 @@ function drawGirl(){
     ctx.strokeStyle='#222'; ctx.lineWidth=1.8;
     ctx.beginPath(); ctx.arc(g.x-4, hy+1, 3.4, 0, Math.PI*2); ctx.stroke();
     ctx.beginPath(); ctx.arc(g.x+4, hy+1, 3.4, 0, Math.PI*2); ctx.stroke();
-    nameTag('MARGARET', g.x, POOL.top - 12, '#ff9ec6');
+    nameTag('NATALKA', g.x, POOL.top - 12, '#ff9ec6');
     return;
   }
   const cheer = state==='fight' && combo >= 3;
@@ -1349,13 +2488,221 @@ function drawGirl(){
   ctx.fillStyle='rgba(255,120,150,.4)';
   ctx.beginPath(); ctx.arc(-7*s,headY+4*s,2*s,0,Math.PI*2); ctx.arc(7*s,headY+4*s,2*s,0,Math.PI*2); ctx.fill();
   ctx.restore();
-  nameTag('MARGARET', g.x, g.y + g.yOff - 132, '#ff9ec6');
+  nameTag('NATALKA', g.x, g.y + g.yOff - 132, '#ff9ec6');
 }
 
 const G = {}; // bufor statycznych gradientów (wydajność — tworzone raz, nie co klatkę)
+// ---------- dekoracje kurortu ----------
+function propPalm(x){
+  const sway = Math.sin(time*1.2 + x*0.01)*6, topX = x + sway, topY = GROUND-165;
+  const trunk = ctx.createLinearGradient(x-14,0,x+6,0);
+  trunk.addColorStop(0,'#7a4a22'); trunk.addColorStop(1,'#9c6a34');
+  ctx.strokeStyle=trunk; ctx.lineWidth=11; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(x-8, GROUND); ctx.quadraticCurveTo(x-22, GROUND-90, topX, topY); ctx.stroke();
+  ctx.strokeStyle='rgba(90,55,20,.35)'; ctx.lineWidth=1.5;
+  for(let i=1;i<7;i++){ const t2=i/7, yy=GROUND-(GROUND-topY)*t2; ctx.beginPath(); ctx.moveTo(x-12-sway*t2*0.3, yy); ctx.lineTo(x-2+sway*t2, yy); ctx.stroke(); }
+  for(let i=0;i<7;i++){
+    ctx.save(); ctx.translate(topX, topY); ctx.rotate(-0.15 - i*0.45 + Math.sin(time*1.5+i)*0.05);
+    const lg=ctx.createLinearGradient(0,0,44,0); lg.addColorStop(0,'#2e8b57'); lg.addColorStop(1,'#3fb56e');
+    ctx.fillStyle=lg;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(24,-6,46,2); ctx.quadraticCurveTo(24,6,0,0); ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle='#6b4a1a';
+  ctx.beginPath(); ctx.arc(topX-7, topY+6, 5, 0, Math.PI*2); ctx.arc(topX+6, topY+8, 5, 0, Math.PI*2); ctx.fill();
+}
+function propLounger(x){
+  ctx.save(); ctx.translate(x, GROUND);
+  ctx.strokeStyle='#a97442'; ctx.lineWidth=4; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-30,0); ctx.lineTo(-30,-18); ctx.moveTo(16,0); ctx.lineTo(16,-18); ctx.stroke();
+  for(let i=0;i<5;i++){ ctx.fillStyle = i%2 ? '#fff' : '#00b4d8'; ctx.fillRect(-36+i*11, -26, 11, 8); }
+  ctx.save(); ctx.translate(19,-24); ctx.rotate(-0.85);
+  for(let i=0;i<4;i++){ ctx.fillStyle = i%2 ? '#fff' : '#00b4d8'; ctx.fillRect(i*10, -4, 10, 8); }
+  ctx.restore(); ctx.restore();
+}
+function propParasol(x){
+  ctx.strokeStyle='#8b5a2b'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(x, GROUND-4); ctx.lineTo(x, GROUND-120); ctx.stroke();
+  ctx.fillStyle='#ff6b6b';
+  ctx.beginPath(); ctx.arc(x, GROUND-120, 55, Math.PI, 0); ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.moveTo(x-55,GROUND-120); ctx.arc(x,GROUND-120,55,Math.PI,0); ctx.closePath();
+  ctx.save(); ctx.clip();
+  for(let i=-2;i<3;i+=2) ctx.fillRect(x+i*18-8, GROUND-180, 16, 70);
+  ctx.restore();
+}
+function propBall(x){
+  ctx.save(); ctx.translate(x, GROUND-12);
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.fill();
+  ['#e63946','#ffb703','#2a9d8f'].forEach((c,i)=>{
+    ctx.fillStyle=c; ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.arc(0,0,12, i*2.1, i*2.1+1.05); ctx.closePath(); ctx.fill();
+  });
+  ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+function propRing(x){
+  ctx.save(); ctx.translate(x, GROUND-34);
+  ctx.strokeStyle='#8b5a2b'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(0,13); ctx.lineTo(0,34); ctx.stroke();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=7; ctx.beginPath(); ctx.arc(0,0,13,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='#e63946'; ctx.lineWidth=7;
+  for(let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(0,0,13, i*1.57+0.3, i*1.57+0.9); ctx.stroke(); }
+  ctx.restore();
+}
+function propSign(x, label){
+  ctx.save(); ctx.translate(x, GROUND);
+  ctx.fillStyle='#8b5a2b'; ctx.fillRect(-3, -78, 6, 78);
+  ctx.fillStyle='#c9954f'; ctx.beginPath();
+  ctx.moveTo(-72,-116); ctx.lineTo(58,-116); ctx.lineTo(78,-100); ctx.lineTo(58,-84); ctx.lineTo(-72,-84); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(90,58,20,.55)'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.22)'; ctx.fillRect(-70,-114,126,4);
+  ctx.fillStyle='#4a2d10'; ctx.font='800 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.textAlign='center';
+  ctx.fillText(label, -4, -95);
+  ctx.fillStyle='#4a2d10'; ctx.font='14px Arial'; ctx.fillText('▶', 64, -95);
+  ctx.restore();
+}
+function propBar(x){
+  ctx.save(); ctx.translate(x, GROUND);
+  ctx.fillStyle='#6f4522'; ctx.fillRect(-90, -78, 180, 78);              // lada
+  ctx.fillStyle='#8b5a2b'; ctx.fillRect(-96, -86, 192, 10);
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(-90, -46, 180, 5);
+  for(let i=0;i<7;i++){ ctx.fillStyle='rgba(255,255,255,.08)'; ctx.fillRect(-88+i*26, -76, 3, 74); }
+  ctx.fillStyle='#c4a05a';                                                // strzecha
+  ctx.beginPath(); ctx.moveTo(-118,-86); ctx.lineTo(0,-146); ctx.lineTo(118,-86); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(90,60,20,.4)'; ctx.lineWidth=2;
+  for(let i=-3;i<=3;i++){ ctx.beginPath(); ctx.moveTo(i*30, -86 - Math.max(0,60-Math.abs(i)*20)); ctx.lineTo(i*30, -86); ctx.stroke(); }
+  ['#e63946','#2a9d8f','#ffb703','#8bc34a'].forEach((c,i)=>{               // butelki
+    ctx.fillStyle=c; ctx.fillRect(-56+i*30, -110, 9, 22);
+    ctx.fillStyle='rgba(255,255,255,.35)'; ctx.fillRect(-54+i*30, -108, 3, 18);
+  });
+  ctx.strokeStyle='#ffd43b'; ctx.lineWidth=1.5;                            // lampki
+  ctx.beginPath(); ctx.moveTo(-116,-88); ctx.quadraticCurveTo(0,-70,116,-88); ctx.stroke();
+  for(let i=0;i<9;i++){ const t2=i/8, bx=-116+232*t2, by=-88+18*Math.sin(Math.PI*t2);
+    ctx.fillStyle = i%2 ? '#fff176' : '#ff8fc8'; ctx.beginPath(); ctx.arc(bx, by+5, 3, 0, Math.PI*2); ctx.fill(); }
+  ctx.restore();
+}
+function propTower(x){
+  ctx.save(); ctx.translate(x, GROUND);
+  ctx.strokeStyle='#b5793d'; ctx.lineWidth=7; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-42,0); ctx.lineTo(-24,-96); ctx.moveTo(42,0); ctx.lineTo(24,-96); ctx.stroke();
+  ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(-36,-40); ctx.lineTo(36,-40); ctx.stroke();
+  ctx.fillStyle='#d8dee8'; ctx.fillRect(-40,-118,80,24);                   // kabina
+  ctx.fillStyle='#e63946'; ctx.fillRect(-40,-118,80,7);
+  ctx.fillStyle='#1b3a63'; ctx.fillRect(-30,-112,26,14);
+  ctx.fillStyle='#c4a05a'; ctx.beginPath();                                 // daszek
+  ctx.moveTo(-52,-118); ctx.lineTo(0,-150); ctx.lineTo(52,-118); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#b5793d'; ctx.lineWidth=4;                               // drabinka
+  ctx.beginPath(); ctx.moveTo(30,-94); ctx.lineTo(46,0); ctx.moveTo(44,-94); ctx.lineTo(58,0); ctx.stroke();
+  ctx.lineWidth=2.5;
+  for(let i=0;i<4;i++){ const yy=-80+i*22; ctx.beginPath(); ctx.moveTo(32+i*2.6, yy); ctx.lineTo(46+i*2.6, yy); ctx.stroke(); }
+  ctx.restore();
+}
+function propShower(x){
+  ctx.save(); ctx.translate(x, GROUND);
+  ctx.fillStyle='#cfd8e3'; ctx.fillRect(-58,-6,116,6);                      // kafelkowy placyk
+  ctx.fillStyle='rgba(255,255,255,.5)';
+  for(let i=0;i<6;i++) ctx.fillRect(-56+i*20,-5,2,4);
+  ctx.strokeStyle='#b9c4d0'; ctx.lineWidth=6; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0,-4); ctx.lineTo(0,-128); ctx.lineTo(26,-128); ctx.stroke();
+  ctx.fillStyle='#9aa7b5'; rr(20,-132,14,8,3); ctx.fill();
+  ctx.strokeStyle='rgba(150,220,255,.7)'; ctx.lineWidth=2;                  // strumienie wody
+  for(let i=0;i<5;i++){
+    const dx2 = 22 + i*3, ph = (time*3 + i*0.6) % 1;
+    ctx.globalAlpha = 0.35 + 0.4*(1-ph);
+    ctx.beginPath(); ctx.moveTo(dx2, -124 + ph*40); ctx.lineTo(dx2 + 1.5, -108 + ph*40); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle='rgba(180,225,255,.35)'; ctx.beginPath(); ctx.ellipse(27,-4,17,4,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function propCabin(x, col){
+  ctx.save(); ctx.translate(x, GROUND);
+  ctx.fillStyle='#f0e6d2'; ctx.fillRect(-44,-118,88,118);
+  ctx.fillStyle=col||'#ff6b6b'; ctx.fillRect(-44,-118,88,10);
+  for(let i=0;i<5;i++){ ctx.fillStyle = i%2 ? col||'#ff6b6b' : '#f7f2e6'; ctx.fillRect(-44+i*18,-108,18,108); }
+  ctx.fillStyle='#c9954f'; ctx.beginPath();                                 // daszek
+  ctx.moveTo(-56,-118); ctx.lineTo(0,-152); ctx.lineTo(56,-118); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.22)'; ctx.fillRect(-20,-96,40,96);             // drzwi
+  ctx.fillStyle='#8b5a2b'; ctx.beginPath(); ctx.arc(12,-48,3.4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function propPlant(x){
+  ctx.save(); ctx.translate(x, GROUND);
+  ctx.fillStyle='#8d6e63'; ctx.beginPath();
+  ctx.moveTo(-16,0); ctx.lineTo(-12,-26); ctx.lineTo(12,-26); ctx.lineTo(16,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#6d4c41'; ctx.fillRect(-18,-30,36,6);
+  for(let i=0;i<6;i++){
+    ctx.save(); ctx.rotate(0); ctx.translate(0,-28);
+    ctx.rotate(-1.3 + i*0.52 + Math.sin(time*1.4+i)*0.05);
+    const lg=ctx.createLinearGradient(0,0,0,-34); lg.addColorStop(0,'#2e8b57'); lg.addColorStop(1,'#4dbd7c');
+    ctx.fillStyle=lg;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(8,-20,0,-36); ctx.quadraticCurveTo(-8,-20,0,0); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function propRope(x){
+  ctx.save(); ctx.translate(x, GROUND);
+  [-60, 60].forEach(px=>{
+    ctx.fillStyle='#c9a227'; ctx.fillRect(px-4,-62,8,62);
+    ctx.beginPath(); ctx.arc(px,-66,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#8a6d14'; ctx.beginPath(); ctx.ellipse(px,-1,13,4,0,0,Math.PI*2); ctx.fill();
+  });
+  ctx.strokeStyle='#8e1c3a'; ctx.lineWidth=7; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-58,-58); ctx.quadraticCurveTo(0,-34,58,-58); ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(-56,-60); ctx.quadraticCurveTo(0,-37,56,-60); ctx.stroke();
+  ctx.restore();
+}
+function propKiosk(x){
+  ctx.save(); ctx.translate(x, GROUND);
+  ctx.fillStyle='#6f4522'; ctx.fillRect(-62,-64,124,64);                    // lada
+  ctx.fillStyle='#8b5a2b'; ctx.fillRect(-70,-72,140,10);
+  ctx.fillStyle='rgba(0,0,0,.16)'; ctx.fillRect(-62,-38,124,4);
+  ctx.fillStyle='#f3ead7'; ctx.fillRect(-52,-120,104,48);                   // tablica z ofertą
+  ctx.strokeStyle='#8b5a2b'; ctx.lineWidth=3; ctx.strokeRect(-52,-120,104,48);
+  ctx.fillStyle='#4a2d10'; ctx.font='800 10px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.textAlign='center';
+  ctx.fillText('BEACH KIOSK', 0, -104);
+  ctx.font='9px Arial';
+  ctx.fillText('🌭 25   🔧 40', 0, -92);
+  ctx.fillText('🎁 60', 0, -80);
+  const st=['#e63946','#fff','#2a9d8f','#fff','#ffb703','#fff'];            // markiza w pasy
+  for(let i=0;i<6;i++){ ctx.fillStyle=st[i];
+    ctx.beginPath(); ctx.moveTo(-78+i*26,-124); ctx.lineTo(-52+i*26,-124); ctx.lineTo(-56+i*26,-140); ctx.lineTo(-82+i*26,-140); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle='#8b5a2b'; ctx.fillRect(-80,-144,160,6);
+  ctx.fillStyle='#ffd43b';                                                   // migający znak "monety"
+  ctx.globalAlpha = 0.55 + 0.45*Math.sin(time*3 + x*0.01);
+  ctx.font='18px Arial'; ctx.fillText('💰', 0, -152);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawProps(){
+  for(const pr of PROPS){
+    if(pr.x < viewL - 260 || pr.x > viewR + 260) continue;   // rysuj tylko to, co widać
+    switch(pr.t){
+      case 'palm':    propPalm(pr.x); break;
+      case 'lounger': propLounger(pr.x); break;
+      case 'parasol': propParasol(pr.x); break;
+      case 'ball':    propBall(pr.x); break;
+      case 'ring':    propRing(pr.x); break;
+      case 'sign':    propSign(pr.x, pr.s); break;
+      case 'bar':     propBar(pr.x); break;
+      case 'tower':   propTower(pr.x); break;
+      case 'shower':  propShower(pr.x); break;
+      case 'cabin':   propCabin(pr.x, pr.c); break;
+      case 'plant':   propPlant(pr.x); break;
+      case 'rope':    propRope(pr.x); break;
+      case 'kiosk':   propKiosk(pr.x); break;
+    }
+  }
+}
+
 function drawScene(){
   const HORIZON = GROUND - 70;
-  const BX = -OX, BW = VW; // tło na całą szerokość ekranu (także pasy boczne iPhone)
+  const BX = viewL, BW = viewR - viewL; // tło liczone w świecie, żeby kamera mogła jechać
+  const fix = camX;                     // warstwa „przyklejona" do ekranu (słońce, chmury)
   // niebo — głębszy, nowoczesny gradient
   if(!G.sky){ G.sky = ctx.createLinearGradient(0,0,0,GROUND);
     G.sky.addColorStop(0,'#2f7fd6'); G.sky.addColorStop(0.45,'#63b3ea'); G.sky.addColorStop(0.8,'#a8dbf2'); G.sky.addColorStop(1,'#e6f6ff'); }
@@ -1363,9 +2710,9 @@ function drawScene(){
   // ciepła poświata słońca (golden hour) — z lewej-górnej strony
   if(!G.warm){ G.warm = ctx.createRadialGradient(120,60,20,120,60,GROUND*1.1);
     G.warm.addColorStop(0,'rgba(255,225,150,0.22)'); G.warm.addColorStop(0.5,'rgba(255,210,140,0.07)'); G.warm.addColorStop(1,'rgba(255,200,120,0)'); }
-  ctx.fillStyle=G.warm; ctx.fillRect(BX,0,BW,GROUND);
+  ctx.save(); ctx.translate(fix,0); ctx.fillStyle=G.warm; ctx.fillRect(BX-fix,0,BW,GROUND); ctx.restore();
   // słońce z miękką poświatą
-  ctx.save(); ctx.translate(96,78);
+  ctx.save(); ctx.translate(96+fix,78);
   const glow = ctx.createRadialGradient(0,0,10,0,0,90);
   glow.addColorStop(0,'rgba(255,240,170,.9)'); glow.addColorStop(0.4,'rgba(255,222,120,.35)'); glow.addColorStop(1,'rgba(255,222,120,0)');
   ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,90,0,Math.PI*2); ctx.fill();
@@ -1376,7 +2723,7 @@ function drawScene(){
   ctx.restore();
   // chmury dryfujące (miękkie, dwuwarstwowe)
   [[240,84,1,10],[520,56,0.8,7],[760,104,1.2,13],[100,134,0.6,5]].forEach(([cx0,cy,cs,spd])=>{
-    const cx = ((cx0 + time*spd) % (W+160)) - 80;
+    const cx = ((cx0 + time*spd) % (W+160)) - 80 + fix*0.78; // chmury: delikatny parallax
     ctx.fillStyle='rgba(255,255,255,.92)';
     ctx.beginPath();
     ctx.arc(cx,cy,20*cs,0,Math.PI*2); ctx.arc(cx+22*cs,cy-9*cs,16*cs,0,Math.PI*2); ctx.arc(cx+44*cs,cy,18*cs,0,Math.PI*2);
@@ -1387,7 +2734,9 @@ function drawScene(){
     G.sea.addColorStop(0,'#3aa0d8'); G.sea.addColorStop(1,'#2b7fc0'); }
   ctx.fillStyle=G.sea; ctx.fillRect(BX,HORIZON,BW,GROUND-HORIZON);
   ctx.fillStyle='#5aa06a';
-  [[180,26],[430,20],[880,30]].forEach(([ix,ih])=>{
+  [[180,26],[430,20],[880,30],[1240,24],[1600,32]].forEach(([ix0,ih])=>{
+    const ix = ix0 + fix*0.86; // wyspy: daleki plan, prawie nie uciekają
+    if(ix < BX-80 || ix > BX+BW+80) return;
     ctx.beginPath(); ctx.moveTo(ix-ih*1.8,HORIZON+2);
     ctx.quadraticCurveTo(ix,HORIZON-ih, ix+ih*1.8,HORIZON+2); ctx.closePath(); ctx.fill();
   });
@@ -1396,7 +2745,7 @@ function drawScene(){
   // mewy
   ctx.strokeStyle='rgba(40,50,70,.55)'; ctx.lineWidth=2; ctx.lineCap='round';
   [[0,60,17],[1,40,11],[2,150,9]].forEach(([k,gy,spd])=>{
-    const gx=((k*260 + time*spd) % (W+80))-40, fl=Math.sin(time*4+k)*3;
+    const gx=((k*260 + time*spd) % (W+80))-40 + fix*0.86, fl=Math.sin(time*4+k)*3;
     ctx.beginPath(); ctx.moveTo(gx-8,gy+fl); ctx.quadraticCurveTo(gx,gy-4+fl,gx+2,gy+fl);
     ctx.quadraticCurveTo(gx+4,gy-4+fl,gx+12,gy+fl); ctx.stroke();
   });
@@ -1416,7 +2765,8 @@ function drawScene(){
   // krawędź pomostu (cień pod nogami)
   ctx.fillStyle='rgba(255,255,255,.18)'; ctx.fillRect(BX,GROUND,BW,2);
   ctx.fillStyle='rgba(60,40,15,.3)'; ctx.fillRect(BX,GROUND+4,BW,3);
-  // basen — obrys z jasnymi kafelkami
+  // basen na końcu kurortu — rysowany tylko wtedy, gdy kamera go widzi
+  if(POOL.x < viewR + 320 && POOL.x + POOL.w > viewL - 320){
   ctx.fillStyle='#eaf4fb'; ctx.fillRect(POOL.x-10, POOL.top-6, POOL.w+20, POOL.depth+18);
   ctx.fillStyle='#9fd0ec'; ctx.fillRect(POOL.x-10, POOL.top-6, POOL.w+20, 4);
   // woda — głęboki gradient + połysk
@@ -1479,61 +2829,32 @@ function drawScene(){
   ctx.moveTo(POOL.x+8, POOL.top); ctx.lineTo(POOL.x+20, POOL.top);
   ctx.moveTo(POOL.x+8, POOL.top+14); ctx.lineTo(POOL.x+20, POOL.top+14);
   ctx.stroke();
-  // parasol
-  ctx.strokeStyle='#8b5a2b'; ctx.lineWidth=4;
-  ctx.beginPath(); ctx.moveTo(870, GROUND-4); ctx.lineTo(870, GROUND-120); ctx.stroke();
-  ctx.fillStyle='#ff6b6b';
-  ctx.beginPath(); ctx.arc(870, GROUND-120, 55, Math.PI, 0); ctx.fill();
-  ctx.fillStyle='#fff';
-  ctx.beginPath(); ctx.moveTo(870-55,GROUND-120); ctx.arc(870,GROUND-120,55,Math.PI,0); ctx.closePath();
-  ctx.save(); ctx.clip();
-  for(let i=-2;i<3;i+=2) ctx.fillRect(870+i*18-8, GROUND-180, 16, 70);
-  ctx.restore();
-  // palma — lekko kołysząca się na wietrze
-  const sway = Math.sin(time*1.2)*6, topX = 60+sway, topY = GROUND-165;
-  const trunk = ctx.createLinearGradient(46,0,66,0);
-  trunk.addColorStop(0,'#7a4a22'); trunk.addColorStop(1,'#9c6a34');
-  ctx.strokeStyle=trunk; ctx.lineWidth=11; ctx.lineCap='round';
-  ctx.beginPath(); ctx.moveTo(52, GROUND); ctx.quadraticCurveTo(38, GROUND-90, topX, topY); ctx.stroke();
-  // segmenty pnia
-  ctx.strokeStyle='rgba(90,55,20,.35)'; ctx.lineWidth=1.5;
-  for(let i=1;i<7;i++){ const t2=i/7, yy=GROUND-(GROUND-topY)*t2; ctx.beginPath(); ctx.moveTo(48-sway*t2*0.3, yy); ctx.lineTo(58+sway*t2, yy); ctx.stroke(); }
-  for(let i=0;i<7;i++){
-    ctx.save(); ctx.translate(topX, topY); ctx.rotate(-0.15 - i*0.45 + Math.sin(time*1.5+i)*0.05);
-    const lg=ctx.createLinearGradient(0,0,44,0); lg.addColorStop(0,'#2e8b57'); lg.addColorStop(1,'#3fb56e');
-    ctx.fillStyle=lg;
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(24,-6,46,2); ctx.quadraticCurveTo(24,6,0,0); ctx.fill();
-    ctx.restore();
-  }
-  ctx.fillStyle='#6b4a1a';
-  ctx.beginPath(); ctx.arc(topX-7, topY+6, 5, 0, Math.PI*2); ctx.arc(topX+6, topY+8, 5, 0, Math.PI*2); ctx.fill();
-  // leżak
-  ctx.save(); ctx.translate(505, GROUND);
-  ctx.strokeStyle='#a97442'; ctx.lineWidth=4; ctx.lineCap='round';
-  ctx.beginPath(); ctx.moveTo(-30,0); ctx.lineTo(-30,-18); ctx.moveTo(16,0); ctx.lineTo(16,-18); ctx.stroke();
-  for(let i=0;i<5;i++){ ctx.fillStyle = i%2 ? '#fff' : '#00b4d8'; ctx.fillRect(-36+i*11, -26, 11, 8); }
-  ctx.save(); ctx.translate(19,-24); ctx.rotate(-0.85);
-  for(let i=0;i<4;i++){ ctx.fillStyle = i%2 ? '#fff' : '#00b4d8'; ctx.fillRect(i*10, -4, 10, 8); }
-  ctx.restore(); ctx.restore();
-  // piłka plażowa
-  ctx.save(); ctx.translate(452, GROUND-12);
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.fill();
-  ['#e63946','#ffb703','#2a9d8f'].forEach((c,i)=>{
-    ctx.fillStyle=c; ctx.beginPath(); ctx.moveTo(0,0);
-    ctx.arc(0,0,12, i*2.1, i*2.1+1.05); ctx.closePath(); ctx.fill();
-  });
-  ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.stroke();
-  ctx.restore();
-  // koło ratunkowe przy drabince
-  ctx.save(); ctx.translate(POOL.x+52, POOL.top-28);
-  ctx.strokeStyle='#fff'; ctx.lineWidth=7; ctx.beginPath(); ctx.arc(0,0,13,0,Math.PI*2); ctx.stroke();
-  ctx.strokeStyle='#e63946'; ctx.lineWidth=7;
-  for(let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(0,0,13, i*1.57+0.3, i*1.57+0.9); ctx.stroke(); }
-  ctx.restore();
-  // hot-dogi
+  } // koniec basenu
+
+  // dekoracje kurortu — palmy, leżaki, bar, wieża, prysznice, kabiny, VIP
+  drawProps();
+
+  // znajdźki na decku: hot-dogi + broń (świecą, żeby rzucały się w oczy)
   if(items) for(const it of items){
-    ctx.font='26px Arial'; ctx.textAlign='center';
-    ctx.fillText('🌭', it.x, GROUND - 8 - Math.abs(Math.sin(it.t*3))*8);
+    const by = it.y !== undefined ? it.y : (GROUND - 8 - Math.abs(Math.sin(it.t*3))*9);
+    const w = it.kind === 'weapon' ? WEAPONS[it.w] : null;
+    const icon = w ? w.icon : (it.kind === 'coin' ? '💰' : it.kind === 'medal' ? '🏅' : '🌭');
+    const col  = w ? w.col  : (it.kind === 'hotdog' ? '#8bc34a' : '#ffd43b');
+    ctx.save();
+    ctx.globalAlpha = 0.3 + 0.25*Math.sin(it.t*4);
+    const gr = ctx.createRadialGradient(it.x, GROUND-4, 0, it.x, GROUND-4, 32);
+    gr.addColorStop(0, col); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.ellipse(it.x, GROUND-4, 32, 11, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.font=(it.kind === 'medal' ? '30px' : '26px') + ' Arial'; ctx.textAlign='center';
+    ctx.fillText(icon, it.x, by);
+    if(w){
+      ctx.font='800 10px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.lineJoin='round';
+      ctx.lineWidth=3.5; ctx.strokeStyle='rgba(0,0,0,.7)';
+      ctx.strokeText(w.name, it.x, by - 26);
+      ctx.fillStyle=col; ctx.fillText(w.name, it.x, by - 26);
+    }
   }
 }
 
@@ -1545,18 +2866,50 @@ function draw(){
   // ---- ŚWIAT (zoom bazowy + uderzeniowy zoom + delikatny dryf kamery za graczem) ----
   ctx.save();
   const z = ZOOM + camPunch;
-  const camX = (state==='fight' && player) ? (player.x - W/2) * 0.06 : 0;
+  // kamera jedzie za Gregiem przez cały kurort, z lekkim wyprzedzeniem w stronę biegu
+  const half = (VW/2)/z;
+  if(state === 'story'){ camX = 0; }
+  else if(player){
+    const look = state==='fight' ? player.moveVx*20 : 0;
+    const cx = Math.max(half, Math.min(WORLD_W - half, player.x + look));
+    camX += (cx - W/2 - camX) * 0.12;
+  }
+  viewL = camX + W/2 - (W/2 + OX)/z;
+  viewR = camX + W/2 + (VW - OX - W/2)/z;
   ctx.translate(W/2, GROUND+18); ctx.scale(z, z); ctx.translate(-W/2 - camX, -(GROUND+18));
   drawScene();
 
   // plansze fabularne
   if(state==='story'){
-    drawGirl();
-    if(storyIdx>=1 && storyCast){
-      drawStick(storyCast.arek);
-      for(const e of enemies) drawStick(e);
+    // obsada plansz fabularnych stoi w stałych miejscach kadru, nie w świecie
+    const realGX = girl.x, realPX = player.x;
+    girl.x = storyCast.girlX; drawGirl(); girl.x = realGX;
+    if(storyIdx===1 && gosia){ // przedstawienie pani Gosi i jej jedynej zasady
+      gosia.shown = true; gosia.x = 330; gosia.facing = 1; gosia.pose = 'point';
+      drawGosia();
+      gosia.shown = false;
     }
-    if(storyIdx>=2) drawStick(player);
+    if(storyIdx>=2 && storyCast){
+      drawStick(storyCast.arek);
+      for(const e of storyCast.mobs) drawStick(e);
+    }
+    if(storyIdx>=3){ player.x = storyCast.playerX; drawStick(player); player.x = realPX; }
+    if(storyIdx>=4){ // wystawka arsenału — nad panelem fabuły, żeby nic nie zasłaniało
+      ctx.textAlign='center';
+      [[170,'noodle'],[330,'umbrella'],[490,'flipflop'],[650,'bucket']].forEach(([dx,wk])=>{
+        const w = WEAPONS[wk];
+        const by = 280 - Math.abs(Math.sin(time*3 + dx*0.01))*7;
+        ctx.save(); ctx.globalAlpha = 0.45;
+        const gr = ctx.createRadialGradient(dx, by-9, 0, dx, by-9, 34);
+        gr.addColorStop(0, w.col); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(dx, by-9, 34, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        ctx.font='32px Arial'; ctx.fillText(w.icon, dx, by);
+        ctx.font='800 12px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.lineJoin='round';
+        ctx.lineWidth=4.5; ctx.strokeStyle='rgba(0,0,0,.8)'; ctx.strokeText(w.name, dx, by+24);
+        ctx.fillStyle=w.col; ctx.fillText(w.name, dx, by+24);
+      });
+    }
     ctx.restore();      // koniec zoomu
     drawStoryPanel();   // panel UI w normalnej skali
     ctx.restore();
@@ -1583,20 +2936,39 @@ function draw(){
       ctx.translate(e.x, GROUND - 30*e.scale); ctx.font='13px Arial'; ctx.textAlign='center';
       for(let i=0;i<3;i++){ const a = time*4 + i*2.1; ctx.fillText('⭐', Math.cos(a)*15*e.scale, Math.sin(a)*5 - 4); }
       ctx.restore();
-    } else drawStick(e);
+    } else {
+      drawStick(e);
+      if(e.pose === 'ready'){ // zapowiedź techniki — pulsujący krąg pod nogami, gracz ma czas zareagować
+        const pulse = 0.35 + 0.65*Math.abs(Math.sin(time*16));
+        ctx.save(); ctx.globalAlpha = pulse;
+        ctx.strokeStyle = (SPECIALS[e.etype] && SPECIALS[e.etype].col) || '#fff'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.ellipse(e.x, GROUND+2, 36*e.scale, 11*e.scale, 0, 0, Math.PI*2); ctx.stroke();
+        ctx.restore();
+      }
+      if(e.frozen > 0){ // zamrożony lodem z wiaderka
+        ctx.font='16px Arial'; ctx.textAlign='center';
+        ctx.globalAlpha = 0.6 + 0.4*Math.sin(time*8);
+        ctx.fillText('❄️', e.x, e.y - 108*e.scale);
+        ctx.globalAlpha = 1;
+      }
+    }
   }
+  // pani Gosia (finał)
+  if(state==='win') drawGosia();
   // gracz
-  if(state==='lose' && cut && ['sunk','girlGrab','girlLift','girlThrow','girlSunk'].includes(cut.phase)){
-    // tylko głowa Adama nad wodą
+  const gregInWater = (state==='lose' && cut && ['sunk','girlGrab','girlLift','girlThrow','girlSunk'].includes(cut.phase))
+                   || (state==='win' && cut && (cut.phase==='gosiaSunk' || (cut.phase==='end' && cut.inPool)));
+  if(gregInWater){
+    // tylko głowa Grega nad wodą
     ctx.save();
     ctx.strokeStyle='#f5f5f5'; ctx.lineWidth=4;
     ctx.beginPath(); ctx.arc(player.x, player.y, 10, 0, Math.PI*2); ctx.stroke();
     ctx.strokeStyle='#e11'; ctx.lineWidth=3;
     ctx.beginPath(); ctx.moveTo(player.x-10, player.y-3); ctx.lineTo(player.x+10, player.y-3); ctx.stroke();
     ctx.restore();
-    nameTag('ADAM', player.x, POOL.top - 12, '#fff');
+    nameTag('GREG', player.x, POOL.top - 12, '#fff');
   } else {
-    // afterimages (smugi ruchu) — świetliste duchy za Adamiem
+    // afterimages (smugi ruchu) — świetliste duchy za Gregiem
     for(const g of trail){
       ctx.save(); ctx.globalAlpha = Math.max(0, g.life/0.2) * 0.32;
       drawStick(g); ctx.restore();
@@ -1604,10 +2976,29 @@ function draw(){
     drawStick(player);
   }
 
+  // porażenie prądem — łuki z packi pani Gosi prosto w Grega
+  if(state==='win' && cut && cut.phase==='gosiaZap'){
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const sx = gosia.x + 54, sy = GROUND - 98;
+    const tx = player.x - 8, ty = GROUND - 66;
+    for(let i=0;i<3;i++)
+      drawLightning(sx, sy, tx + (Math.random()-0.5)*28, ty + (Math.random()-0.5)*44, 7, 18, 'rgba(185,235,255,0.95)', 3.2);
+    drawLightning(sx, sy, tx, ty, 6, 9, 'rgba(255,255,255,0.95)', 1.5);
+    ctx.restore();
+  }
+
   // dymki oświadczyn po zwycięstwie
-  if(state==='win' && cut && ['kneel','yes','end'].includes(cut.phase)){
-    bubble(player.x, GROUND - 152, '💍 Margaret… will you marry me?');
+  if(state==='win' && cut && ['kneel','yes'].includes(cut.phase)){
+    bubble(player.x, GROUND - 152, '💍 Natalka… will you marry me?');
     if(cut.phase !== 'kneel') bubble(girl.x, GROUND - 198, 'YES! YES! ❤️');
+  }
+  // dymki finału z panią Gosią
+  if(state==='win' && cut && cut.phase==='gosiaWarn')
+    bubble(gosia.x, GROUND - 150, '📣 THAT WAS YOUR EIGHTH, GREG.');
+  if(state==='win' && cut && ['gosiaSunk','end'].includes(cut.phase) && cut.inPool){
+    bubble(gosia.x, GROUND - 150, '✅ Rules are rules, Greg.');
+    bubble(girl.x, GROUND - 200, 'I still said yes! 💍');
   }
 
   // błyski uderzeń — świetlna poświata + biały rozbłysk (additive)
@@ -1623,6 +3014,49 @@ function draw(){
     ctx.strokeStyle='rgba(255,255,255,'+(0.7*k).toFixed(2)+')'; ctx.lineWidth=2.5;
     ctx.beginPath(); ctx.arc(h.x,h.y,h.r,0,Math.PI*2); ctx.stroke();
   }
+  // ślady technik karate i zamachów bronią
+  for(const w of wfx){
+    const k = Math.max(0, w.life / 0.34), s = w.s || 1;
+    ctx.save(); ctx.translate(w.x, w.y); ctx.scale(w.f || 1, 1);
+    ctx.strokeStyle = w.col; ctx.lineCap = 'round'; ctx.globalAlpha = k;
+    if(w.t === 'upperFx'){                      // pióropusz w górę za pięścią
+      ctx.lineWidth = 5*s;
+      ctx.beginPath(); ctx.arc(16*s, -14*s, 42*s, -1.5, 0.35); ctx.stroke();
+      ctx.lineWidth = 2.5*s;
+      ctx.beginPath(); ctx.arc(16*s, -14*s, 56*s, -1.35, 0.1); ctx.stroke();
+    } else if(w.t === 'spinFx'){                // pełny okrąg wokół gracza
+      ctx.lineWidth = 6*s;
+      ctx.beginPath(); ctx.ellipse(0, -52*s, 96*s*(1.15-k*0.15), 26*s, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.lineWidth = 2.5*s; ctx.globalAlpha = k*0.6;
+      ctx.beginPath(); ctx.ellipse(0, -52*s, 116*s, 32*s, 0, 0, Math.PI*2); ctx.stroke();
+    } else if(w.t === 'sweepFx'){               // nisko przy deskach
+      ctx.lineWidth = 5*s;
+      ctx.beginPath(); ctx.arc(0, -8*s, 88*s, -0.5, 0.5); ctx.stroke();
+    } else if(w.t === 'flyFx'){                 // smugi pędu
+      ctx.lineWidth = 4*s; ctx.globalAlpha = k*0.8;
+      for(let i=0;i<3;i++){ const yy = -34*s - i*20*s;
+        ctx.beginPath(); ctx.moveTo(-18*s, yy); ctx.lineTo(-18*s - (40 + i*14)*s, yy); ctx.stroke(); }
+    } else if(w.t === 'wSweep'){                // szeroki zamach makaronem
+      ctx.lineWidth = 9*s; ctx.globalAlpha = k*0.75;
+      ctx.beginPath(); ctx.arc(6*s, 0, 118*s, -1.0, 0.7); ctx.stroke();
+      ctx.lineWidth = 3.5*s; ctx.strokeStyle = '#fff'; ctx.globalAlpha = k*0.5;
+      ctx.beginPath(); ctx.arc(6*s, 0, 100*s, -0.85, 0.5); ctx.stroke();
+    } else if(w.t === 'wSmash'){                // uderzenie parasolem o deski
+      ctx.lineWidth = 6*s; ctx.globalAlpha = k*0.85;
+      const rr2 = (1 - k) * 92*s + 12;
+      ctx.beginPath(); ctx.ellipse(0, 0, rr2, rr2*0.28, 0, Math.PI, Math.PI*2); ctx.stroke();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2.5*s;
+      ctx.beginPath(); ctx.ellipse(0, 0, rr2*0.66, rr2*0.19, 0, Math.PI, Math.PI*2); ctx.stroke();
+    } else if(w.t === 'wFrost'){                // stożek mroźnej mgły
+      ctx.globalAlpha = k*0.7;
+      const grd = ctx.createLinearGradient(0,0,150*s,0);
+      grd.addColorStop(0, w.col); grd.addColorStop(1, 'rgba(160,230,255,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.moveTo(0,-8*s); ctx.lineTo(150*s,-44*s); ctx.lineTo(150*s,44*s); ctx.lineTo(0,10*s); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
   // cząsteczki
@@ -1650,9 +3084,19 @@ function draw(){
   ctx.font='20px Arial'; ctx.textAlign='center';
   for(const h of hearts){ ctx.globalAlpha = Math.min(1,h.life); ctx.fillText('❤️', h.x, h.y); }
   ctx.globalAlpha = 1;
-  // piłki plażowe w locie
+  // piłki plażowe i rzucone klapki w locie
   for(const b of balls){
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+    if(b.flop){ // klapek kręci się w powietrzu
+      ctx.fillStyle='#8bc34a';
+      ctx.beginPath(); ctx.ellipse(0,0,13,6,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#5f8f28';
+      ctx.beginPath(); ctx.ellipse(0,1.6,13,4.4,0,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#ff5252'; ctx.lineWidth=2.4; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(-7,-3); ctx.lineTo(3,-1); ctx.lineTo(8,-4); ctx.stroke();
+      ctx.restore();
+      continue;
+    }
     ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.fill();
     ['#e63946','#ffb703','#2a9d8f'].forEach((c,i)=>{
       ctx.fillStyle=c; ctx.beginPath(); ctx.moveTo(0,0);
@@ -1671,6 +3115,28 @@ function draw(){
     ctx.fillStyle='#bfeaff'; ctx.beginPath(); ctx.ellipse(s.r*0.4,0,s.r*0.9,s.r*0.55,0,0,Math.PI*2); ctx.fill();
     ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s.r*0.6,-s.r*0.15,s.r*0.3,0,Math.PI*2); ctx.fill();
     ctx.restore();
+  }
+  // ---- GAZ ŁZAWIĄCY: kłęby + chmury (miękkie, półprzezroczyste) ----
+  for(const pf of gasPuffs){
+    const a = Math.max(0, pf.life) * 0.5;
+    const gg = ctx.createRadialGradient(pf.x, pf.y, 0, pf.x, pf.y, pf.r);
+    gg.addColorStop(0, 'rgba(214,230,150,'+(a*0.9).toFixed(3)+')');
+    gg.addColorStop(0.6, 'rgba(176,205,110,'+(a*0.6).toFixed(3)+')');
+    gg.addColorStop(1, 'rgba(150,180,90,0)');
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(pf.x, pf.y, pf.r, 0, Math.PI*2); ctx.fill();
+  }
+  for(const g of gasClouds){
+    const a = Math.min(1, g.life/1.0);
+    for(let k=0;k<5;k++){
+      const ang = g.seed + k*1.7 + time*0.6;
+      const rr0 = g.r*(0.55+0.25*Math.sin(g.seed+k));
+      const ox = Math.cos(ang)*g.r*0.42, oy = Math.sin(ang*1.3)*g.r*0.3;
+      const gg = ctx.createRadialGradient(g.x+ox, g.y+oy, 0, g.x+ox, g.y+oy, rr0);
+      gg.addColorStop(0, 'rgba(206,224,140,'+(0.34*a).toFixed(3)+')');
+      gg.addColorStop(0.7, 'rgba(170,200,105,'+(0.2*a).toFixed(3)+')');
+      gg.addColorStop(1, 'rgba(150,180,90,0)');
+      ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(g.x+ox, g.y+oy, rr0, 0, Math.PI*2); ctx.fill();
+    }
   }
   // dymki punktów — z animacją pop-in (skalowanie)
   for(const p of popups){
@@ -1693,7 +3159,7 @@ function draw(){
   if(!G.vig){ G.vig = ctx.createRadialGradient(W/2, H*0.46, H*0.35, W/2, H*0.5, H*0.95);
     G.vig.addColorStop(0,'rgba(0,0,0,0)'); G.vig.addColorStop(1,'rgba(10,14,30,0.32)'); }
   ctx.fillStyle=G.vig; ctx.fillRect(-OX,0,VW,H);
-  // czerwona winieta bólu (gdy Adam oberwie)
+  // czerwona winieta bólu (gdy Greg oberwie)
   if(dmgVig > 0){
     const rv = ctx.createRadialGradient(W/2, H*0.5, H*0.3, W/2, H*0.5, H*0.85);
     rv.addColorStop(0,'rgba(255,0,0,0)'); rv.addColorStop(1,'rgba(220,20,20,'+(0.5*dmgVig).toFixed(2)+')');
@@ -1707,11 +3173,11 @@ function draw(){
 
   // HUD — panel gracza (szkło)
   const F = '-apple-system,BlinkMacSystemFont,"Segoe UI",Arial';
-  rr(16,14,266,58,15);
+  rr(16,14,266,92,15);
   ctx.fillStyle='rgba(10,14,30,.6)'; ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.lineWidth=1.2; ctx.stroke();
   ctx.fillStyle='#fff'; ctx.font='700 12.5px '+F; ctx.textAlign='left';
-  ctx.fillText('🥋 ADAM — THE WHITE WARRIOR', 30, 33);
+  ctx.fillText('📣 GREG — CHEER SQUAD 💙', 30, 33);
   // chip trudności
   ctx.font='800 10px '+F; const dw = ctx.measureText(diff.name).width + 12;
   rr(268-dw-2, 20, dw, 15, 7.5); ctx.fillStyle=diff.col; ctx.globalAlpha=0.9; ctx.fill(); ctx.globalAlpha=1;
@@ -1734,19 +3200,25 @@ function draw(){
   rr(30,41,238,17,8.5); ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1; ctx.stroke();
   ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='700 10.5px '+F; ctx.textAlign='center';
   ctx.fillText(Math.max(0,player.hp)+' / '+player.maxHp, 149, 54);
-  // pasek SUPER (ładowany trafieniami)
-  rr(30,63,238,6,3); ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fill();
-  if(superCharge>0){
-    rr(30,63,Math.max(6,238*superCharge/100),6,3);
-    ctx.fillStyle = superCharge>=100 ? '#fff176' : '#e0a800'; ctx.fill();
-  }
+  // wiersz GAZU — jedyna broń Grega, pasek gotowości
+  ctx.textAlign='left'; ctx.font='15px Arial';
+  ctx.fillText('💨', 30, 90);
+  ctx.font='800 11px '+F; ctx.fillStyle='#cee08c';
+  ctx.fillText('GAZ ŁZAWIĄCY', 54, 82);
+  rr(54, 86, 214, 6, 3); ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fill();
+  const gk = 1 - Math.min(1, gasCd/0.42);
+  rr(54, 86, Math.max(5, 214*gk), 6, 3);
+  ctx.fillStyle = gk >= 1 ? '#cee08c' : '#8aa04e'; ctx.fill();
+  ctx.font='700 9.5px '+F; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,.8)';
+  ctx.fillText(gk>=1 ? 'GOTOWY' : '...', 268, 82);
+  ctx.textAlign='left';
   if(superCharge>=100 && state==='fight'){
     const stxt = touchUI ? '⚡ SUPER READY — tap ⚡' : '⚡ SUPER READY — press L';
     ctx.font='800 12px '+F; ctx.textAlign='left'; ctx.lineJoin='round';
     ctx.lineWidth=3.5; ctx.strokeStyle='rgba(0,0,0,.65)';
-    ctx.strokeText(stxt, 30, 89);
+    ctx.strokeText(stxt, 30, 126);
     ctx.fillStyle='rgba(255,241,118,'+(0.55+0.45*Math.sin(time*8)).toFixed(2)+')';
-    ctx.fillText(stxt, 30, 89);
+    ctx.fillText(stxt, 30, 126);
   }
 
   // wynik + rekord (pigułka)
@@ -1760,34 +3232,115 @@ function draw(){
   // combo
   if(combo >= 2 && state==='fight'){
     const cs = 22 + Math.min(combo,10)*1.5 + Math.sin(time*10)*2;
-    ctx.font='bold ' + cs + 'px Arial'; ctx.lineJoin='round';
+    ctx.font='bold ' + cs + 'px Arial'; ctx.lineJoin='round'; ctx.textAlign='left';
     ctx.lineWidth=5; ctx.strokeStyle='rgba(0,0,0,.7)';
-    ctx.strokeText('COMBO x' + combo + '!', 150, 105);
+    ctx.strokeText('COMBO x' + combo + '!', 30, 170);
     ctx.fillStyle = combo>=5 ? '#ff5252' : '#ffd43b';
-    ctx.fillText('COMBO x' + combo + '!', 150, 105);
+    ctx.fillText('COMBO x' + combo + '!', 30, 170);
   }
 
   if(state==='fight'){
-    // pigułka fali (na dotyku pod wynikiem, żeby nie kolidowała z przyciskami)
-    const wl = WAVES[wave] ? WAVES[wave].label : '';
+    // pigułka lokacji + pasek postępu przez cały kurort
+    const ar = AREAS[wave];
+    const wl = (ar ? ar.name : 'POOLSIDE') + '   ' + Math.min(AREAS.length, wave+1) + '/' + AREAS.length;
     ctx.font='700 13px '+F;
-    const ww = Math.max(120, ctx.measureText(wl).width + 36);
+    const ww = Math.max(190, ctx.measureText(wl).width + 40);
     const wx = touchUI ? W/2-ww/2 : W-ww-16, wy = touchUI ? 52 : 14;
-    rr(wx, wy, ww, 30, 15);
+    rr(wx, wy, ww, 44, 15);
     ctx.fillStyle='rgba(10,14,30,.6)'; ctx.fill();
     ctx.strokeStyle='rgba(255,212,59,.4)'; ctx.lineWidth=1.2; ctx.stroke();
     ctx.fillStyle='#ffd43b'; ctx.textAlign='center';
-    ctx.fillText(wl, wx+ww/2, wy+20);
-    if(msgT>0 && WAVES[wave]){
-      const a = Math.min(1, msgT);
-      ctx.fillStyle='rgba(255,255,255,'+a.toFixed(2)+')';
-      ctx.font='900 38px '+F; ctx.lineJoin='round';
-      ctx.lineWidth=8; ctx.strokeStyle='rgba(0,0,0,'+(a*0.4).toFixed(2)+')';
-      ctx.strokeText(WAVES[wave].label, W/2, 180);
-      ctx.fillText(WAVES[wave].label, W/2, 180);
-      ctx.font='italic 600 18px '+F;
-      ctx.fillStyle='rgba(255,222,150,'+a.toFixed(2)+')';
-      ctx.fillText(WAVES[wave].q || '', W/2, 212);
+    ctx.fillText(wl, wx+ww/2, wy+19);
+    // ile drogi za Gregiem
+    const prog = Math.max(0, Math.min(1, (player.x - 60) / (WORLD_MAX_X - 60)));
+    rr(wx+14, wy+27, ww-28, 7, 3.5); ctx.fillStyle='rgba(255,255,255,.12)'; ctx.fill();
+    rr(wx+14, wy+27, Math.max(6,(ww-28)*prog), 7, 3.5);
+    const pg2 = ctx.createLinearGradient(wx,0,wx+ww,0);
+    pg2.addColorStop(0,'#ffd43b'); pg2.addColorStop(1,'#ff9c00');
+    ctx.fillStyle=pg2; ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='700 9px '+F;
+    ctx.fillText('🏁', wx+ww-7, wy+34);
+    // monety
+    ctx.font='700 12px '+F; ctx.textAlign='right'; ctx.fillStyle='#ffd43b';
+    ctx.fillText('💰 ' + coins, wx - 12, wy+22);
+    ctx.textAlign='center';
+
+    // tablica narracyjna wejścia/wyjścia z lokacji
+    if(bannerT > 0 && banner){
+      const a = Math.min(1, bannerT/0.8) * Math.min(1, (4.6-bannerT)/0.25);
+      ctx.globalAlpha = Math.max(0, a);
+      const bw2 = 660, bh2 = banner.note ? 106 : 76, bx2 = W/2-bw2/2, by2 = 128;
+      rr(bx2, by2, bw2, bh2, 16);
+      ctx.fillStyle='rgba(10,14,30,.72)'; ctx.fill();
+      ctx.strokeStyle=banner.col; ctx.lineWidth=1.6; ctx.stroke();
+      rr(bx2, by2, bw2, 4, 2); ctx.fillStyle=banner.col; ctx.fill();
+      ctx.fillStyle=banner.col; ctx.font='900 22px '+F;
+      ctx.fillText(banner.title, W/2, by2+32);
+      ctx.fillStyle='#e8ecff'; ctx.font='500 14px '+F;
+      wrapText(banner.text, W/2, by2+55, bw2-60, 18);
+      if(banner.note){                              // megafon pani Gosi
+        ctx.fillStyle='rgba(255,255,255,.14)'; ctx.fillRect(bx2+26, by2+68, bw2-52, 1);
+        ctx.fillStyle='#c8ff5e'; ctx.font='italic 700 13px '+F;
+        wrapText('📢 ' + banner.note, W/2, by2+88, bw2-60, 16);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // ---- KIOSK: na co wymienić monety ----
+    if(kioskNear){
+      const kw = 470, kh = 88, kx = W/2-kw/2, ky = H-118;   // nisko, żeby nie zasłaniać Grega
+      rr(kx, ky, kw, kh, 16);
+      ctx.fillStyle='rgba(10,14,30,.84)'; ctx.fill();
+      ctx.strokeStyle='#ffd43b'; ctx.lineWidth=1.6; ctx.stroke();
+      ctx.textAlign='center';
+      ctx.fillStyle='#ffd43b'; ctx.font='800 14px '+F;
+      ctx.fillText('🏖️ BEACH KIOSK — you have 💰 ' + coins, W/2, ky+22);
+      const offers = [
+        [touchUI?'👊':'1', '🌭 FULL HEALTH',   25, player.hp < player.maxHp],
+        [touchUI?'🦵':'2', '🔧 REFILL WEAPON', 40, !!player.weapon],
+        [touchUI?'⚡':'3', '🎁 NEW WEAPON',    60, true]
+      ];
+      offers.forEach((o,i)=>{
+        const ow = (kw-36)/3 - 10, ox = kx + 18 + i*((kw-36)/3);
+        const afford = coins >= o[2] && o[3];
+        rr(ox, ky+32, ow, 42, 10);
+        ctx.fillStyle = afford ? 'rgba(139,195,74,.22)' : 'rgba(255,255,255,.06)'; ctx.fill();
+        ctx.strokeStyle = afford ? '#8bc34a' : 'rgba(255,255,255,.18)'; ctx.lineWidth=1.2; ctx.stroke();
+        ctx.fillStyle = afford ? '#dfffcf' : 'rgba(255,255,255,.4)'; ctx.font='700 11px '+F;
+        ctx.fillText(o[1], ox+ow/2, ky+49);
+        ctx.font='800 12px '+F; ctx.fillStyle = afford ? '#ffd43b' : 'rgba(255,212,59,.35)';
+        ctx.fillText('💰 ' + o[2] + '   [' + o[0] + ']', ox+ow/2, ky+66);
+      });
+      if(kioskMsgT > 0){
+        ctx.globalAlpha = Math.min(1, kioskMsgT);
+        ctx.fillStyle='#fff'; ctx.font='800 13px '+F;
+        ctx.fillText(kioskMsg, W/2, ky-10);
+        ctx.globalAlpha = 1;
+      }
+    }
+    // strzałka „idź dalej" po wyczyszczeniu terenu
+    if(areaPhase === 'clear' && !(ar && ar.boss)){
+      const pulse = 0.55 + 0.45*Math.sin(goArrowT*6);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle='#8bc34a'; ctx.font='900 40px '+F;
+      ctx.fillText('▶▶', W-70, H/2);
+      ctx.font='800 13px '+F; ctx.fillStyle='#dfffcf';
+      ctx.fillText('KEEP GOING', W-70, H/2+24);
+      ctx.globalAlpha = 1;
+    }
+    // bariera areny — widać, że dalej nie przejdziesz, póki nie posprzątasz
+    if(areaPhase === 'fight' && ar){
+      const sx2 = W/2 + (ar.x1 + 26 - camX - W/2)*(ZOOM+camPunch);
+      if(sx2 > -OX && sx2 < VW-OX){
+        ctx.save();
+        ctx.globalAlpha = 0.5 + 0.2*Math.sin(time*4);
+        ctx.strokeStyle='#ff5252'; ctx.lineWidth=4; ctx.setLineDash([14,12]);
+        ctx.beginPath(); ctx.moveTo(sx2, 60); ctx.lineTo(sx2, H-40); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle='#ff5252'; ctx.font='800 12px '+F;
+        ctx.save(); ctx.translate(sx2-14, H/2); ctx.rotate(-Math.PI/2);
+        ctx.fillText('CLEAR THE AREA', 0, 0); ctx.restore();
+        ctx.restore();
+      }
     }
     // pasek HP bossa (Mr Arek)
     if(arek && !arek.dead && enemies.includes(arek)){
@@ -1810,11 +3363,16 @@ function draw(){
 
   ctx.textAlign='center';
   if(state==='win' && cut && cut.phase==='end'){
-    overlay('💍 SHE SAID YES! 💍', 'Adam saved Margaret — and won her heart! ❤️', 'Tap or press R to play again');
+    if(cut.inPool)
+      overlay('💍 SHE SAID YES… 💦', 'Seven warnings over the tannoy. The eighth one Pani Gosia delivered in person. Rules are rules. ⚡🦵', 'Tap or press R to play again');
+    else
+      overlay('💍 SHE SAID YES! 💍', 'Eight fights across her resort — and Pani Gosia only grazed him. Greg got off lightly. ⚡', 'Tap or press R to play again');
   } else if(state==='lose' && cut && cut.phase==='girlSunk' && cut.t>0.6){
-    overlay('💀 ADAM, YOU LOSER! 💀', 'They threw Margaret into the water and you failed to protect her! 🌊', 'Tap or press R to try again');
+    overlay('💀 GREG, YOU LOSER! 💀', 'They threw Natalka into the water and you failed to protect her! 🌊', 'Tap or press R to try again');
+  } else if(state==='lose' && cut && cut.phase==='gloat' && cut.t>1.2){
+    overlay('💀 DOWN ON THE DECK 💀', 'Mr Arek left you flat at ' + (AREAS[wave] ? AREAS[wave].name : 'the resort') + '. His crew is walking on to the pool — to Natalka.', 'Tap or press R to try again');
   }
-  if(paused) overlay('⏸ PAUSED', 'Adam is catching his breath…', 'Press P to resume');
+  if(paused) overlay('⏸ PAUSED', 'Greg is catching his breath…', 'Press P to resume');
 
   ctx.restore();
 }
