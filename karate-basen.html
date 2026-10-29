@@ -3038,6 +3038,8 @@ function drawScene(){
   // krawędź pomostu (cień pod nogami)
   ctx.fillStyle='rgba(255,255,255,.18)'; ctx.fillRect(BX,GROUND,BW,2);
   ctx.fillStyle='rgba(60,40,15,.3)'; ctx.fillRect(BX,GROUND+4,BW,3);
+  // BUDYNKI KURORTU — różne obiekty na promenadzie (postęp widoczny)
+  drawResortBuildings(viewL, viewR);
   // basen na końcu kurortu — rysowany tylko wtedy, gdy kamera go widzi
   if(POOL.x < viewR + 320 && POOL.x + POOL.w > viewL - 320){
   ctx.fillStyle='#eaf4fb'; ctx.fillRect(POOL.x-10, POOL.top-6, POOL.w+20, POOL.depth+18);
@@ -3128,6 +3130,97 @@ function drawScene(){
       ctx.strokeText(w.name, it.x, by - 26);
       ctx.fillStyle=col; ctx.fillText(w.name, it.x, by - 26);
     }
+  }
+}
+
+// ---- BUDYNKI KURORTU: różne na całej promenadzie, żeby było widać postęp ----
+const BUILDINGS = [
+  {x:360,  type:'bar'},    {x:760,  type:'cabana'}, {x:1180, type:'tower'},
+  {x:1600, type:'icecream'},{x:2050, type:'hotel'}, {x:2520, type:'surf'},
+  {x:2980, type:'cabana'}, {x:3440, type:'bar'},    {x:3900, type:'snack'},
+  {x:4360, type:'hotel'},  {x:4820, type:'tower'}
+];
+function drawResortBuildings(vl, vr){
+  const yb = GROUND - 4; // osadzone na promenadzie
+  for(const b of BUILDINGS){
+    if(b.x < vl-220 || b.x > vr+220) continue;   // culling
+    ctx.save(); ctx.translate(b.x, yb);
+    // cień pod budynkiem
+    ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(0,2,70,8,0,0,Math.PI*2); ctx.fill();
+    drawBuilding(b.type);
+    ctx.restore();
+  }
+}
+function winGrid(x,y,w,h,cols,rows,lit){
+  for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){
+    const on = ((i*7+j*3)%5===0);
+    ctx.fillStyle = (lit&&on) ? 'rgba(255,224,150,0.95)' : 'rgba(150,200,235,0.85)';
+    ctx.fillRect(x+i*(w/cols)+2, y+j*(h/rows)+2, w/cols-4, h/rows-4);
+  }
+}
+function drawBuilding(type){
+  // wszystko rysowane w górę od (0,0) = poziom promenady
+  if(type==='hotel'){
+    const w=150,h=150;
+    const g=ctx.createLinearGradient(-w/2,0,w/2,0); g.addColorStop(0,'#e7d9c2'); g.addColorStop(1,'#cdb998');
+    ctx.fillStyle=g; rr(-w/2,-h,w,h,6); ctx.fill();
+    ctx.fillStyle='#b89f7e'; ctx.fillRect(-w/2,-h,w,10);          // gzyms
+    ctx.fillStyle='#8a6b4a'; rr(-w/2-8,-h-14,w+16,16,4); ctx.fill(); // dach
+    winGrid(-w/2+10,-h+22, w-20, h-40, 5, 4, true);
+    ctx.fillStyle='#2b6fb5'; rr(-22,-34,44,34,3); ctx.fill();      // drzwi/lobby
+    ctx.fillStyle='#ffd43b'; ctx.font='bold 13px Arial'; ctx.textAlign='center'; ctx.fillText('HOTEL', 0,-h+16);
+  } else if(type==='bar'){
+    const w=130,h=74;
+    ctx.fillStyle='#caa26a'; rr(-w/2,-h,w,h,5); ctx.fill();
+    ctx.fillStyle='#8b5a2b'; for(let i=-2;i<=2;i++) ctx.fillRect(i*28-3,-h,6,h); // bambus
+    // strzecha
+    ctx.fillStyle='#c79a4f'; ctx.beginPath(); ctx.moveTo(-w/2-16,-h); ctx.lineTo(0,-h-36); ctx.lineTo(w/2+16,-h); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#a87f3c'; for(let i=-3;i<=3;i++){ ctx.beginPath(); ctx.moveTo(i*10,-h); ctx.lineTo(i*8,-h-30); ctx.lineTo(i*10+4,-h); ctx.fill(); }
+    ctx.fillStyle='#4a3524'; ctx.fillRect(-w/2+8,-34,w-16,8); // bar
+    ctx.fillStyle='#ffd43b'; ctx.font='bold 12px Arial'; ctx.textAlign='center'; ctx.fillText('TIKI BAR', 0,-h-6);
+  } else if(type==='cabana'){
+    const w=96,h=70;
+    // paski markizy
+    for(let i=0;i<6;i++){ ctx.fillStyle=i%2?'#ffffff':'#e0564e'; ctx.fillRect(-w/2+i*(w/6),-h,w/6,h); }
+    ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(-w/2,-20,w,20);
+    // daszek
+    ctx.fillStyle='#c0392b'; ctx.beginPath(); ctx.moveTo(-w/2-8,-h); ctx.lineTo(0,-h-24); ctx.lineTo(w/2+8,-h); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(-w/2-8,-h); ctx.lineTo(-w/6,-h-18); ctx.lineTo(-w/6+8,-h); ctx.fill();
+  } else if(type==='tower'){
+    const w=58,h=120;
+    ctx.strokeStyle='#9c6b3a'; ctx.lineWidth=7; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(-w/2+6,0); ctx.lineTo(-w/2+14,-h+40); ctx.moveTo(w/2-6,0); ctx.lineTo(w/2-14,-h+40); ctx.stroke();
+    ctx.fillStyle='#d94f4f'; rr(-w/2,-h+10,w,46,4); ctx.fill();       // kabina
+    ctx.fillStyle='#fff'; ctx.fillRect(-w/2+6,-h+18,w-12,16);          // okno
+    ctx.fillStyle='#b5392f'; ctx.beginPath(); ctx.moveTo(-w/2-6,-h+10); ctx.lineTo(0,-h-14); ctx.lineTo(w/2+6,-h+10); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.fillText('LIFEGUARD',0,-h-18);
+  } else if(type==='icecream'){
+    const w=80,h=60;
+    const g=ctx.createLinearGradient(0,-h,0,0); g.addColorStop(0,'#ffe0ec'); g.addColorStop(1,'#ffc0d8');
+    ctx.fillStyle=g; rr(-w/2,-h,w,h,5); ctx.fill();
+    for(let i=0;i<5;i++){ ctx.fillStyle=i%2?'#ff5fa2':'#fff'; ctx.fillRect(-w/2+i*(w/5),-h-14,w/5,14); } // markiza
+    ctx.fillStyle='#fff'; ctx.fillRect(-w/2+8,-h+14,w-16,26); // lada
+    // wielki rożek na dachu
+    ctx.save(); ctx.translate(0,-h-14);
+    ctx.fillStyle='#e8b06a'; ctx.beginPath(); ctx.moveTo(-10,0); ctx.lineTo(0,26); ctx.lineTo(10,0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#ff8fc8'; ctx.beginPath(); ctx.arc(-4,-4,8,0,Math.PI*2); ctx.arc(5,-3,8,0,Math.PI*2); ctx.arc(0,-11,8,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  } else if(type==='surf'){
+    const w=104,h=66;
+    const g=ctx.createLinearGradient(0,-h,0,0); g.addColorStop(0,'#5fb6c9'); g.addColorStop(1,'#3d93a6');
+    ctx.fillStyle=g; rr(-w/2,-h,w,h,5); ctx.fill();
+    ctx.fillStyle='#2f7585'; ctx.fillRect(-w/2,-h,w,9);
+    ctx.fillStyle='#1f5560'; ctx.beginPath(); ctx.moveTo(-w/2-6,-h); ctx.lineTo(w/2+6,-h); ctx.lineTo(w/2+6,-h-12); ctx.lineTo(-w/2-6,-h-4); ctx.closePath(); ctx.fill();
+    // deski surfingowe oparte
+    [['#ff6b6b',-30],['#ffd43b',-14],['#8bc34a',2]].forEach(([c,dx],i)=>{ ctx.save(); ctx.translate(dx,-6); ctx.rotate(-0.25);
+      ctx.fillStyle=c; rr(-5,-52,10,52,5); ctx.fill(); ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(-1,-50,2,48); ctx.restore(); });
+    ctx.fillStyle='#fff'; ctx.font='bold 11px Arial'; ctx.textAlign='center'; ctx.fillText('SURF',0,-h+22);
+  } else { // snack
+    const w=90,h=58;
+    ctx.fillStyle='#e9d7b0'; rr(-w/2,-h,w,h,5); ctx.fill();
+    for(let i=0;i<5;i++){ ctx.fillStyle=i%2?'#ffd43b':'#e0564e'; ctx.fillRect(-w/2+i*(w/5),-h-12,w/5,12); }
+    ctx.fillStyle='#8a6b4a'; ctx.fillRect(-w/2+8,-h+12,w-16,24);
+    ctx.fillStyle='#c0392b'; ctx.font='bold 12px Arial'; ctx.textAlign='center'; ctx.fillText('SNACKS',0,-h+8);
   }
 }
 
