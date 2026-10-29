@@ -1783,15 +1783,19 @@ function drawSheep(f, s, sh, hip, headY, headR, legF, legB, hurtFlash, limbCol){
   }
   // ogonek
   ctx.fillStyle=wool; ctx.beginPath(); ctx.arc(-bw*0.98, by+1*s, 4.2*s, 0, Math.PI*2); ctx.fill();
-  // --- wełniste ciało ---
+  // --- wełniste ciało (miękkie, gradientowe 3D) ---
   ctx.fillStyle=woolSh; ctx.beginPath(); ctx.ellipse(1.5*s,by+2.5*s,bw,bh,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=wool;   ctx.beginPath(); ctx.ellipse(0,by,bw,bh,0,0,Math.PI*2); ctx.fill();
-  const N=10;
+  const woolHi = big ? '#5c564e' : '#fbf6ea', woolLo = big ? '#332e29' : '#d8cdb1';
+  const bodyG = ctx.createRadialGradient(-bw*0.3, by-bh*0.4, bh*0.2, 0, by+bh*0.2, bw*1.2);
+  bodyG.addColorStop(0, woolHi); bodyG.addColorStop(0.55, wool); bodyG.addColorStop(1, woolLo);
+  ctx.fillStyle=bodyG; ctx.beginPath(); ctx.ellipse(0,by,bw,bh,0,0,Math.PI*2); ctx.fill();
+  const N=10, br=(big?5.4:4.3)*s;
   for(let i=0;i<N;i++){ const a=i/N*Math.PI*2; const bx=Math.cos(a)*bw*0.74, byy=by+Math.sin(a)*bh*0.8;
-    ctx.beginPath(); ctx.arc(bx,byy,(big?5.4:4.3)*s,0,Math.PI*2); ctx.fill(); }
-  ctx.fillStyle='rgba(255,255,255,0.33)';
-  for(let i=0;i<N;i++){ const a=i/N*Math.PI*2; const byy=by+Math.sin(a)*bh*0.8; if(byy<by){ const bx=Math.cos(a)*bw*0.74;
-    ctx.beginPath(); ctx.arc(bx-1*s,byy-1*s,(big?2.4:1.9)*s,0,Math.PI*2); ctx.fill(); } }
+    // kłębek z własnym łagodnym cieniowaniem
+    const bg=ctx.createRadialGradient(bx-br*0.4,byy-br*0.5,0, bx,byy,br*1.15);
+    bg.addColorStop(0, woolHi); bg.addColorStop(0.6, wool); bg.addColorStop(1, woolLo);
+    ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(bx,byy,br,0,Math.PI*2); ctx.fill();
+  }
   // --- GŁOWA z przodu (prawa strona = kierunek) ---
   const hx=bw*0.92, hy=by-bh*0.25, hr=headR*(big?1.05:0.95);
   // zakręcone rogi
@@ -1811,8 +1815,10 @@ function drawSheep(f, s, sh, hip, headY, headR, legF, legB, hurtFlash, limbCol){
   ctx.fillStyle=dark;
   ctx.beginPath(); ctx.ellipse(hx-hr*0.5,hy+hr*0.2,3.8*s,1.9*s,-0.5,0,Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.ellipse(hx+hr*0.5,hy+hr*0.2,3.8*s,1.9*s,0.5,0,Math.PI*2); ctx.fill();
-  // ciemny pysk-twarz
-  ctx.fillStyle=dark; ctx.beginPath(); ctx.ellipse(hx,hy,hr*0.86,hr*1.02,0,0,Math.PI*2); ctx.fill();
+  // ciemny pysk-twarz (gradient dla objętości)
+  const faceG=ctx.createRadialGradient(hx-hr*0.3,hy-hr*0.4,hr*0.1, hx,hy,hr*1.1);
+  faceG.addColorStop(0, big?'#2a221c':'#4a3c30'); faceG.addColorStop(1, dark);
+  ctx.fillStyle=faceG; ctx.beginPath(); ctx.ellipse(hx,hy,hr*0.86,hr*1.02,0,0,Math.PI*2); ctx.fill();
   // wełna na czole
   ctx.fillStyle=wool; for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.arc(hx+i*3*s,hy-hr*0.85,3*s,0,Math.PI*2); ctx.fill(); }
   // jasny pysk + nozdrza
@@ -2001,8 +2007,14 @@ function drawStick(f){
   [footB,footF].forEach(ft=>{ if(ft){ ctx.save(); ctx.translate(ft.hx,ft.hy); ctx.beginPath(); ctx.ellipse(3*s,1*s,6*s,3.4*s,0,0,Math.PI*2); ctx.fill(); ctx.restore(); } });
 
   // --- TUŁÓW (wypełniony, barki szersze niż biodra) ---
-  ctx.fillStyle = f.cheer ? (hurtFlash?'#ff8aa0':(zapFlash?'#bfe4ff':'#2f74d8'))
-                : gi ? (hurtFlash?'#ffd6d6':(zapFlash?'#fffbe0':'#f7f7f7')) : bodyCol;
+  if(f.cheer && !hurtFlash && !zapFlash){
+    const topG=ctx.createLinearGradient(0, sh.y-4*s, 0, hip.y+5*s);
+    topG.addColorStop(0,'#4a90e8'); topG.addColorStop(0.55,'#2f74d8'); topG.addColorStop(1,'#1f57ad');
+    ctx.fillStyle=topG;
+  } else {
+    ctx.fillStyle = f.cheer ? (hurtFlash?'#ff8aa0':(zapFlash?'#bfe4ff':'#2f74d8'))
+                  : gi ? (hurtFlash?'#ffd6d6':(zapFlash?'#fffbe0':'#f7f7f7')) : bodyCol;
+  }
   ctx.beginPath();
   ctx.moveTo(-hipW, hip.y);
   ctx.lineTo(-shW, sh.y+3*s);
