@@ -1764,6 +1764,77 @@ function drawPompom(x, y, s, t){
   ctx.restore();
 }
 
+// ===== OWCA / BARAN — pełne zwierzę (wrogowie) =====
+function drawSheep(f, s, sh, hip, headY, headR, legF, legB, hurtFlash, limbCol){
+  const big = f.isArek;
+  const wool   = hurtFlash ? '#ffe0e0' : (big ? '#4a443e' : '#efe7d2');
+  const woolSh = big ? 'rgba(0,0,0,0.32)' : 'rgba(110,100,78,0.3)';
+  const dark   = big ? '#15110d' : '#352a20';
+  const legCol = big ? '#15110d' : '#2c241d';
+  const bw = (big?22:16.5)*s, bh = (big?15:11.5)*s, by = -(big?40:34)*s;
+  const run = (f.pose==='charge'); const amp = run?4.5:2.2;
+  // --- 4 krótkie nogi z kopytkami ---
+  ctx.strokeStyle=legCol; ctx.lineWidth=(big?5.5:4.2)*s; ctx.lineCap='round';
+  const legX=[-bw*0.62,-bw*0.22,bw*0.22,bw*0.62], legPh=[0,Math.PI,Math.PI*0.5,Math.PI*1.5];
+  for(let i=0;i<4;i++){
+    const sw=Math.sin(f.walkT+legPh[i])*amp*s;
+    ctx.beginPath(); ctx.moveTo(legX[i], by+bh*0.55); ctx.lineTo(legX[i]+sw, -1*s); ctx.stroke();
+    ctx.fillStyle=dark; ctx.beginPath(); ctx.ellipse(legX[i]+sw,-0.5*s,2.8*s,2*s,0,0,Math.PI*2); ctx.fill();
+  }
+  // ogonek
+  ctx.fillStyle=wool; ctx.beginPath(); ctx.arc(-bw*0.98, by+1*s, 4.2*s, 0, Math.PI*2); ctx.fill();
+  // --- wełniste ciało ---
+  ctx.fillStyle=woolSh; ctx.beginPath(); ctx.ellipse(1.5*s,by+2.5*s,bw,bh,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=wool;   ctx.beginPath(); ctx.ellipse(0,by,bw,bh,0,0,Math.PI*2); ctx.fill();
+  const N=10;
+  for(let i=0;i<N;i++){ const a=i/N*Math.PI*2; const bx=Math.cos(a)*bw*0.74, byy=by+Math.sin(a)*bh*0.8;
+    ctx.beginPath(); ctx.arc(bx,byy,(big?5.4:4.3)*s,0,Math.PI*2); ctx.fill(); }
+  ctx.fillStyle='rgba(255,255,255,0.33)';
+  for(let i=0;i<N;i++){ const a=i/N*Math.PI*2; const byy=by+Math.sin(a)*bh*0.8; if(byy<by){ const bx=Math.cos(a)*bw*0.74;
+    ctx.beginPath(); ctx.arc(bx-1*s,byy-1*s,(big?2.4:1.9)*s,0,Math.PI*2); ctx.fill(); } }
+  // --- GŁOWA z przodu (prawa strona = kierunek) ---
+  const hx=bw*0.92, hy=by-bh*0.25, hr=headR*(big?1.05:0.95);
+  // zakręcone rogi
+  const hornCol=hurtFlash?'#f0ddb4':(big?'#6b5a3a':'#c7a86f'), hornDk=big?'#4a3d26':'#9c8352';
+  function horn(dir){
+    const cx0=hx+dir*hr*0.55, cy0=hy-hr*0.5;
+    for(let pass=0;pass<2;pass++){
+      ctx.strokeStyle=pass===0?hornDk:hornCol; ctx.lineWidth=(pass===0?5:3.6)*s; ctx.lineCap='round';
+      ctx.beginPath();
+      for(let t=0;t<=1.001;t+=0.09){ const ang=(dir>0?-0.4:Math.PI+0.4)+dir*t*5.0; const rad=(5.6-t*3.9)*s;
+        const px=cx0+Math.cos(ang)*rad, py=cy0+Math.sin(ang)*rad+t*2.6*s; t===0?ctx.moveTo(px,py):ctx.lineTo(px,py); }
+      ctx.stroke();
+    }
+  }
+  horn(-1); horn(1);
+  // uszy
+  ctx.fillStyle=dark;
+  ctx.beginPath(); ctx.ellipse(hx-hr*0.5,hy+hr*0.2,3.8*s,1.9*s,-0.5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hx+hr*0.5,hy+hr*0.2,3.8*s,1.9*s,0.5,0,Math.PI*2); ctx.fill();
+  // ciemny pysk-twarz
+  ctx.fillStyle=dark; ctx.beginPath(); ctx.ellipse(hx,hy,hr*0.86,hr*1.02,0,0,Math.PI*2); ctx.fill();
+  // wełna na czole
+  ctx.fillStyle=wool; for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.arc(hx+i*3*s,hy-hr*0.85,3*s,0,Math.PI*2); ctx.fill(); }
+  // jasny pysk + nozdrza
+  ctx.fillStyle=big?'#241d19':'#d8cdb8'; ctx.beginPath(); ctx.ellipse(hx+hr*0.42,hy+hr*0.42,hr*0.6,hr*0.46,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#120e0b'; ctx.beginPath(); ctx.ellipse(hx+hr*0.2,hy+hr*0.35,0.9*s,1.2*s,0,0,6.3); ctx.ellipse(hx+hr*0.62,hy+hr*0.35,0.9*s,1.2*s,0,0,6.3); ctx.fill();
+  // oczy (wściekłe)
+  if(big){ ctx.shadowColor='#ff0000'; ctx.shadowBlur=8; }
+  ctx.fillStyle=big?'#ff2020':'#ffdd33';
+  ctx.beginPath(); ctx.arc(hx-1*s,hy-1*s,(big?2.2:1.7)*s,0,Math.PI*2); ctx.arc(hx+4*s,hy-1*s,(big?2.2:1.7)*s,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.strokeStyle=hornDk; ctx.lineWidth=1.6*s; // brwi
+  ctx.beginPath(); ctx.moveTo(hx-3*s,hy-3.4*s); ctx.lineTo(hx+0.5*s,hy-1.6*s); ctx.moveTo(hx+1.5*s,hy-1.6*s); ctx.lineTo(hx+6*s,hy-3.4*s); ctx.stroke();
+  // OKULARY przeciwsłoneczne (chronią przed gazem)
+  if(f.glasses){
+    ctx.fillStyle='rgba(15,20,30,0.94)'; ctx.strokeStyle='#000'; ctx.lineWidth=1.3*s;
+    ctx.beginPath(); ctx.ellipse(hx-1*s,hy-1*s,3*s,2.5*s,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(hx+4.5*s,hy-1*s,3*s,2.5*s,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.lineWidth=1.4*s; ctx.beginPath(); ctx.moveTo(hx+1.6*s,hy-1.3*s); ctx.lineTo(hx+2*s,hy-1.3*s); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1*s; ctx.beginPath(); ctx.moveTo(hx-2.4*s,hy-2*s); ctx.lineTo(hx-0.6*s,hy-2.2*s); ctx.stroke();
+  }
+}
+
 function drawStick(f){
   const s = f.scale;
   ctx.save();
@@ -1918,6 +1989,8 @@ function drawStick(f){
   const armW=(f.isArek?8:6.2)*s, legW=(f.isArek?9.2:7)*s;
   const shW=(f.isArek?14:11.5)*s, hipW=(f.isArek?10.5:8.2)*s;
 
+  if(!gi){ drawSheep(f, s, sh, hip, headY, headR, legF, legB, hurtFlash, limbCol); }
+  else {
   // --- NOGI (za tułowiem) ---
   ctx.strokeStyle = limbCol;
   let footF, footB;
@@ -1938,6 +2011,18 @@ function drawStick(f){
   ctx.quadraticCurveTo(0, hip.y+5*s, -hipW, hip.y);
   ctx.closePath();
   ctx.fill();
+  // WEŁNA barana — kremowe kłęby na tułowiu (tylko wrogowie)
+  if(!gi){
+    const woolCol = hurtFlash ? '#ffe0e0' : (f.isArek ? '#3b3530' : '#efe7d2');
+    const woolSh  = f.isArek ? 'rgba(0,0,0,0.3)' : 'rgba(120,110,85,0.28)';
+    const cT = sh.y+4*s, cB = hip.y+2*s, cM = (cT+cB)/2;
+    const bumps = [[-shW*0.68,cT,5],[0,sh.y-1*s,6],[shW*0.68,cT,5],
+                   [-hipW*0.85,cM,5.6],[hipW*0.85,cM,5.6],
+                   [-hipW*0.45,cB,5],[hipW*0.45,cB,5],[0,cB+1.5*s,5.6]];
+    ctx.fillStyle=woolSh; for(const b of bumps){ ctx.beginPath(); ctx.arc(b[0]+1*s,b[1]+1.6*s,b[2]*s,0,Math.PI*2); ctx.fill(); }
+    ctx.fillStyle=woolCol; for(const b of bumps){ ctx.beginPath(); ctx.arc(b[0],b[1],b[2]*s,0,Math.PI*2); ctx.fill(); }
+    ctx.fillStyle='rgba(255,255,255,0.35)'; for(const b of bumps){ ctx.beginPath(); ctx.arc(b[0]-b[2]*0.35*s,b[1]-b[2]*0.4*s,b[2]*0.35*s,0,Math.PI*2); ctx.fill(); }
+  }
   // cieniowanie tułowia + rozcięcie gi (klip do sylwetki)
   ctx.save(); ctx.clip();
   ctx.fillStyle='rgba(0,0,0,0.16)'; ctx.fillRect(2*s, sh.y-8*s, shW+6*s, 46*s);
@@ -2065,6 +2150,39 @@ function drawStick(f){
       ctx.stroke();
     }
   } else {
+    // ===== BARAN: uszy, zakręcone rogi, wełniany czub, pysk =====
+    const hornCol = hurtFlash ? '#f0ddb4' : (f.isArek ? '#6b5a3a' : '#c7a86f');
+    const hornDk  = f.isArek ? '#4a3d26' : '#9c8352';
+    // uszy (za głową, zwisające na boki)
+    ctx.fillStyle = f.isArek ? '#1a140f' : '#6b5844';
+    ctx.beginPath(); ctx.ellipse(-headR*0.85, headY+2.5*s, 4.2*s, 2.2*s, -0.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(headR*0.85, headY+2.5*s, 4.2*s, 2.2*s, 0.5, 0, Math.PI*2); ctx.fill();
+    // zakręcone rogi po bokach (spirala do wewnątrz)
+    function ramHorn(dir){
+      const cx0 = dir*(headR*0.75), cy0 = headY - headR*0.55;
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      for(let pass=0; pass<2; pass++){
+        ctx.strokeStyle = pass===0 ? hornDk : hornCol;
+        ctx.lineWidth = (pass===0 ? 5.4 : 4.0)*s;
+        ctx.beginPath();
+        for(let t=0;t<=1.001;t+=0.08){
+          const ang = (dir>0 ? -0.5 : Math.PI+0.5) + dir*t*5.2;
+          const rad = (6.4 - t*4.4)*s;
+          const px = cx0 + Math.cos(ang)*rad, py = cy0 + Math.sin(ang)*rad + t*3*s;
+          t===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+        }
+        ctx.stroke();
+      }
+    }
+    ramHorn(-1); ramHorn(1);
+    // wełniany czub na głowie
+    ctx.fillStyle = hurtFlash ? '#ffe3e3' : (f.isArek ? '#3b3530' : '#efe7d2');
+    for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.arc(i*3*s, headY-headR+1.5*s, 3.3*s, 0, Math.PI*2); ctx.fill(); }
+    // pysk (jasny) + nozdrza
+    ctx.fillStyle = f.isArek ? '#2a2320' : '#d8cdb8';
+    ctx.beginPath(); ctx.ellipse(6.5*s, headY+4.5*s, 5.4*s, 4.2*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#1a1512';
+    ctx.beginPath(); ctx.ellipse(5*s, headY+3.6*s, 0.9*s,1.3*s,0,0,6.3); ctx.ellipse(8.2*s, headY+3.6*s, 0.9*s,1.3*s,0,0,6.3); ctx.fill();
     // wrogowie — wściekłe świecące oczy + kolorowa opaska
     const eyeCol = f.isArek ? '#ff2020' : '#ffdd33';
     if(f.isArek){ ctx.shadowColor='#ff0000'; ctx.shadowBlur=8; }
@@ -2218,6 +2336,7 @@ function drawStick(f){
       ctx.restore();
     }
   }
+  } // --- koniec gałęzi gracz-człowiek (else do if(!gi)) ---
 
   ctx.restore();
 
