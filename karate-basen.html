@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0b0e1e">
-<title>Greg i Barany</title>
+<title>Greg &amp; The Rams</title>
 <style>
   html{overscroll-behavior:none;}
   body{margin:0;background:linear-gradient(160deg,#111433 0%,#0b0e1e 55%,#141b3d 100%);display:flex;flex-direction:column;align-items:center;
@@ -32,7 +32,9 @@
     user-select:none;-webkit-user-select:none;touch-action:none;transition:transform .08s ease,background .08s ease;}
   .tbtn:active{background:rgba(255,255,255,.34);transform:scale(.9);}
   .tbtn-gas{width:78px;height:78px;font-size:30px;background:rgba(150,180,90,.42);border-color:rgba(214,230,150,.6);}
-  body.touchmode #touch .tbtn-gas{width:70px;height:70px;font-size:30px;}
+  .tbtn-gasup{font-size:21px;letter-spacing:-3px;background:rgba(120,170,210,.42);border-color:rgba(170,215,255,.6);}
+  body.touchmode #touch .tbtn-gas{width:74px;height:74px;font-size:32px;}
+  body.touchmode #touch .tbtn-gasup{font-size:22px;}
   body.touchmode #touch{display:flex;}
   body.touchmode #info{display:none;}
   #topbtns{display:none;position:fixed;top:calc(6px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));z-index:11;gap:8px;}
@@ -49,7 +51,7 @@
     border-top:1px solid rgba(255,255,255,.14);
     padding:6px calc(8px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));}
   body.touchmode .tgroup{gap:7px;}
-  body.touchmode #touch .tbtn{width:48px;height:48px;font-size:19px;}
+  body.touchmode #touch .tbtn{width:54px;height:54px;font-size:21px;}
   @media (orientation:portrait) and (max-width:900px){
     body.touchmode #rotate{display:flex;}
   }
@@ -77,9 +79,6 @@
 </style>
 </head>
 <body>
-<h1>📣 GREG I BARANY 💨</h1>
-<div id="info"><b>←/→</b> ruch &nbsp;·&nbsp; <b>W/↑</b> skok &nbsp;·&nbsp; <b>J / spacja</b> gaz łzawiący 💨 &nbsp;·&nbsp; <b>S</b> blok 🛡️ &nbsp;·&nbsp; <b>M</b> muzyka &nbsp;·&nbsp; <b>P</b> pauza &nbsp;·&nbsp; <b>R</b> restart<br>
-Jesteś <b>Gregiem w stroju cheerleaderki</b> 💙 — gazuj barana za baranem i <b>uwolnij Natalkę</b>!</div>
 <canvas id="c" width="960" height="540"></canvas>
 <div id="topbtns">
   <div class="tbtn" data-act="pause">⏸</div>
@@ -94,19 +93,18 @@ Jesteś <b>Gregiem w stroju cheerleaderki</b> 💙 — gazuj barana za baranem i
   </div>
   <div class="tgroup">
     <div class="tbtn" data-k="s">🛡️</div>
-    <div class="tbtn tbtn-gas" data-k="j">💨</div>
+    <div class="tbtn tbtn-gas tbtn-gasup" data-k="u" title="Gas up">💨⬆</div>
+    <div class="tbtn tbtn-gas" data-k="j" title="Gas forward">💨</div>
   </div>
 </div>
-<div id="hint">Jesteś Gregiem w stroju cheerleaderki 💙 — gazuj każdego barana gazem łzawiącym i uwolnij Natalkę! Uważaj na Panią Gosię.</div>
+<div id="hint">You are Greg in a cheerleader dress 💙 — gas every ram with tear gas and free Natalka! Watch out for Ms Gosia.</div>
 <div id="rotate"><div class="big">📱</div><div>Rotate your phone<br>to play 🥋</div></div>
 <div id="diffmenu">
-  <div class="dm-title">🥋 CHOOSE YOUR CHALLENGE</div>
+  <div class="dm-title">📣 GREG &amp; THE RAMS 💨</div>
   <div class="dm-btns">
-    <button class="dm" data-d="easy"><b>EASY</b><span>Relaxed poolside brawl</span></button>
-    <button class="dm" data-d="normal"><b>NORMAL</b><span>A fair fight</span></button>
-    <button class="dm" data-d="hard"><b>HARD</b><span>Only for champions</span></button>
+    <button class="dm" data-d="normal"><b>▶ PLAY</b><span>Gas the rams &middot; free Natalka</span></button>
   </div>
-  <div class="dm-hint">tap a card &nbsp;·&nbsp; or press 1 / 2 / 3</div>
+  <div class="dm-hint">tap PLAY &nbsp;·&nbsp; or press Enter / Space</div>
 </div>
 <script>
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
@@ -211,11 +209,9 @@ function anyKeyAction(){
 }
 addEventListener('keydown', e=>{
   const k = e.key.toLowerCase();
-  // menu wyboru trudności ma pierwszeństwo
+  // ekran startowy — dowolny klawisz akcji startuje grę (tylko jeden poziom: NORMAL)
   if(typeof diffMenuEl !== 'undefined' && diffMenuEl.style.display !== 'none' && diffMenuEl.style.display !== ''){
-    if(k==='1') chooseDiff('easy');
-    else if(k==='2') chooseDiff('normal');
-    else if(k==='3') chooseDiff('hard');
+    if(k==='enter' || k===' ' || k==='1' || k==='2' || k==='3') chooseDiff('normal');
     return;
   }
   keys[k] = true;
@@ -358,7 +354,7 @@ function init(){
   };
 }
 
-// ---------- PANI GOSIA — kierowniczka basenu z elektryczną packą ----------
+// ---------- MS GOSIA — kierowniczka basenu z elektryczną packą ----------
 function mkGosia(x){
   return {x, y:GROUND, t:0, pose:'idle', walkT:0, facing:1, zapT:0, kickT:0, blow:0, shown:false};
 }
@@ -410,7 +406,7 @@ function updatePumpkins(dt){
         p.dead = true; pumpkinSplat(p.x,p.y);
         player.hp -= 10*diff.edmg; player.hurtT = 0.5; player.vx += Math.sign(player.x-p.x)*3;
         dmgVig = Math.max(dmgVig,0.6); camPunch = Math.max(camPunch,0.05); shake = Math.max(shake,8);
-        addPopup(player.x, player.y-96, 'DYNIA! 🎃', '#ff9f43');
+        addPopup(player.x, player.y-96, 'PUMPKIN! 🎃', '#ff9f43');
         if(player.hp<=0){ player.hp=0; }
       }
     }
@@ -428,11 +424,9 @@ function pumpkinSplat(x,y){
     particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2.5,life:0.6,color:(i%3?'#ff8c1a':'#ffd43b')}); }
 }
 
-// poziomy trudności — mnożniki nakładane na bazowe (EASY) wartości wrogów + HP gracza
+// jeden poziom gry — NORMAL (easy/hard usunięte na życzenie)
 const DIFFS = {
-  easy:   {name:'EASY',   sub:'Relaxed poolside brawl', ehp:1.0,  edmg:0.7, espd:0.95, php:170, col:'#8bc34a'},
-  normal: {name:'NORMAL', sub:'A fair fight',           ehp:1.2,  edmg:1.1, espd:1.05, php:140, col:'#ffd43b'},
-  hard:   {name:'HARD',   sub:'Only for champions',     ehp:1.6,  edmg:1.8, espd:1.2,  php:100, col:'#ff5252'}
+  normal: {name:'NORMAL', sub:'A fair fight',           ehp:1.2,  edmg:1.1, espd:1.05, php:140, col:'#ffd43b'}
 };
 let diff = DIFFS.normal;
 
@@ -464,31 +458,31 @@ const AREAS = [
   {name:'THE BOARDWALK', x0:520,  x1:900,  entry:'run', mobs:['zbir','zbir'],
    intro:'Two of them are loitering by the gate. “Turn around, mate. Pool’s closed today.”',
    clear:'Boardwalk clear. The sunbed row is next — keep walking east.',
-   warn:'PANI GOSIA (tannoy): Warning one. There is NO FIGHTING at Palm Cove.'},
+   warn:'MS GOSIA (tannoy): Warning one. There is NO FIGHTING at Palm Cove.'},
   {name:'THE SUNBED ROW', x0:1180, x1:1560, entry:'mix', mobs:['szybki','zbir','szybki'],
    intro:'They kicked the guests off the loungers. The quick ones circle you between the beds.',
    clear:'Sunbeds retaken. Someone left a towel and a snack behind — take them.',
-   warn:'PANI GOSIA: Warning two, Greg. I can see the whole deck from here.'},
+   warn:'MS GOSIA: Warning two, Greg. I can see the whole deck from here.'},
   {name:'THE BEACH BAR', x0:1840, x1:2220, entry:'drop', mobs:['miotacz','zbir','miotacz'],
    intro:'The bar is theirs. Two of them vault the counter and start lobbing beach balls.',
    clear:'Bar’s yours. The tips they stole are scattered all over the deck.',
-   warn:'PANI GOSIA: Warning three. That counter was polished this morning.'},
+   warn:'MS GOSIA: Warning three. That counter was polished this morning.'},
   {name:'THE LIFEGUARD TOWER', x0:2500, x1:2880, entry:'drop', mobs:['ratownik','szybki','zbir'],
    intro:'The lifeguard climbs down, and he is not here to rescue anyone. “Nobody runs on MY deck.”',
    clear:'From the tower you can see the deep end. Natalka is still there. So is Mr Arek.',
-   warn:'PANI GOSIA: Warning four. My lifeguard, Greg. MY lifeguard.'},
+   warn:'MS GOSIA: Warning four. My lifeguard, Greg. MY lifeguard.'},
   {name:'THE SHOWERS', x0:3160, x1:3540, entry:'run', mobs:['gruby','zbir','gruby'],
    intro:'Wet tiles, two heavy lads blocking the rinse-off. “Sit on him, boys.”',
    clear:'Floor is slippery but clear. Cabins ahead — watch the doors.',
-   warn:'PANI GOSIA: Warning five. Somebody is mopping that up. Guess who.'},
+   warn:'MS GOSIA: Warning five. Somebody is mopping that up. Guess who.'},
   {name:'THE CHANGING CABINS', x0:3820, x1:4200, entry:'drop', mobs:['szybki','ratownik','miotacz','zbir'],
    intro:'Doors bang open one after another. Classic ambush, cabin by cabin.',
    clear:'All doors quiet. Ahead: the VIP deck. That is where the suits stand.',
-   warn:'PANI GOSIA: Warning six. Those cabins are rented by the hour.'},
+   warn:'MS GOSIA: Warning six. Those cabins are rented by the hour.'},
   {name:'THE VIP DECK', x0:4480, x1:4860, entry:'mix', mobs:['ochroniarz','miotacz','ochroniarz'],
    intro:'Velvet rope, two bouncers, one thrower. “You’re not on the list, mate.”',
    clear:'Rope is down. One stretch left — the pool, Natalka, and Mr Arek.',
-   warn:'PANI GOSIA: Warning seven. Do NOT make me come down there.'},
+   warn:'MS GOSIA: Warning seven. Do NOT make me come down there.'},
   {name:'POOLSIDE — MR AREK', x0:5000, x1:WORLD_MAX_X, entry:'run', boss:true, mobs:['arek','miotacz','ochroniarz'],
    intro:'Mr Arek is standing over Natalka at the deep end. “My pool. Your funeral, Greg.”',
    clear:'Mr Arek is down. Natalka is safe. The whole resort has gone very quiet.'},
@@ -786,16 +780,20 @@ function fireWater(p){
 }
 
 // ---------- GAZ ŁZAWIĄCY (jedyna broń Grega) ----------
-function sprayGas(p){
+function sprayGas(p, forceUp){
   gasCd = 0.3;
-  const up = !p.onGround;               // SKOK + gaz = strzał w górę (na wiedźmy na miotłach)
+  // W górę: skok+gaz albo dedykowany przycisk „gaz w górę". Trzymając ←/→ przy tym — gaz leci SKOSEM.
+  const up = forceUp || !p.onGround;
   p.pose = 'spray'; p.poseT = 0;
   if(up){
-    const mx = p.x, my = p.y - 70*p.scale;
-    // słup gazu pnie się w górę — dosięga wiedźm
-    gasClouds.push({x:mx, y:my, vx:p.facing*1.2, vy:-7.5, r:14, maxR:86+Math.random()*14, life:3.4, seed:Math.random()*99, owner:'player', up:true});
-    for(let i=0;i<12;i++) gasPuffs.push({x:mx, y:my, vx:(Math.random()-0.5)*3, vy:-4-Math.random()*4, r:3+Math.random()*4, life:0.5+Math.random()*0.3});
-    p.vy += 0.6;                        // lekki odrzut w dół
+    const diagH = (keys['arrowleft']||keys['a']) ? -1 : (keys['arrowright']||keys['d']) ? 1 : 0;
+    const vx = diagH!==0 ? diagH*4.4 : p.facing*1.1;   // skos, gdy trzymany kierunek; inaczej pionowo
+    if(diagH!==0) p.facing = diagH;
+    const mx = p.x + diagH*14, my = p.y - 70*p.scale;
+    // słup gazu pnie się w górę (lub ukośnie) — dosięga wiedźm
+    gasClouds.push({x:mx, y:my, vx, vy:-7.2, r:14, maxR:86+Math.random()*14, life:3.4, seed:Math.random()*99, owner:'player', up:true});
+    for(let i=0;i<12;i++) gasPuffs.push({x:mx, y:my, vx:vx*0.4+(Math.random()-0.5)*3, vy:-4-Math.random()*4, r:3+Math.random()*4, life:0.5+Math.random()*0.3});
+    if(!p.onGround) p.vy += 0.6;        // w locie: lekki odrzut w dół
   } else {
     p.moveVx -= p.facing * 1.0;          // lekki odrzut od puszki
     const mx = p.x + p.facing*26*p.scale, my = p.y - 56*p.scale;
@@ -824,7 +822,7 @@ function updateGas(dt){
           // okularnik: gaz go nie bierze — ale chmura zbija mu okulary z nosa
           e.glasses = false; e.glassLost = 0.0;
           glassFlies.push({x:e.x, y:e.y-62*e.scale, vx:(e.x>g.x?2:-2)+(Math.random()-0.5), vy:-3-Math.random(), rot:0, vr:0.3, life:1.1});
-          addPopup(e.x, e.y-110*e.scale, 'OKULARY SPADŁY! 👓', '#9adcff');
+          addPopup(e.x, e.y-110*e.scale, 'GLASSES OFF! 👓', '#9adcff');
           beep(900,0.05,'square',0.05,-300);
           continue;
         }
@@ -840,7 +838,7 @@ function updateGas(dt){
         const dx = w.x - g.x, dy = w.y - g.y;
         if(dx*dx + dy*dy < (g.r*0.95)*(g.r*0.95)){
           w.spook = 2.6; w.throwCd = Math.max(w.throwCd, 3.0);
-          addPopup(w.x, w.y-30, 'ODGAZOWANA! 💨 '+w.name, '#9adcff');
+          addPopup(w.x, w.y-30, 'GASSED! 💨 '+w.name, '#9adcff');
           addScore(40, w.x, w.y-20); burst(w.x, w.y, '#b6f', 12);
           beep(300,0.2,'sawtooth',0.04,-200);
         }
@@ -1139,9 +1137,10 @@ function updateFight(dt){
     if(keys['arrowleft']||keys['a']){ targetVx = -p.speed; p.facing=-1; moving=true; }
     if(keys['arrowright']||keys['d']){ targetVx = p.speed; p.facing=1; moving=true; }
     if((keys['arrowup']||keys['w']||keys[' ']) && p.onGround){ p.vy=-10.6; p.onGround=false; p.squash=-0.18; }
-    // GREG MA TYLKO GAZ ŁZAWIĄCY — jeden przycisk natarcia (J / K / F / spacja-atak)
-    if((keys['j'] || keys['k'] || keys['f']) && gasCd<=0 && p.attackCd<=0){
-      sprayGas(p);
+    // GREG MA TYLKO GAZ ŁZAWIĄCY. W bok: J / K / F. W GÓRĘ (na wiedźmy): U / I lub skok+gaz.
+    if(gasCd<=0 && p.attackCd<=0){
+      if(keys['u'] || keys['i']) sprayGas(p, true);         // dedykowany „gaz w górę" (też na telefon)
+      else if(keys['j'] || keys['k'] || keys['f']) sprayGas(p); // gaz przed siebie (lub w górę, gdy w skoku)
     }
   }
   gasCd = Math.max(0, gasCd - dt);
@@ -1246,7 +1245,7 @@ function updateFight(dt){
         p.vx = e.chargeDir*13; p.vy=-5.5; p.onGround=false; p.moveVx=0; p.pose='hit'; p.poseT=0; p.squash=0.2;
         shake=Math.max(shake,10); hitStop=Math.max(hitStop,0.06);
         beep(85,0.16,'sine',0.11,-40); beep(300,0.1,'sawtooth',0.06,-150);
-        addPopup(p.x, p.y-150, 'BARAN CIĘ PRZEWRÓCIŁ! 🐏', '#ff8a8a');
+        addPopup(p.x, p.y-150, 'A RAM FLOORED YOU! 🐏', '#ff8a8a');
         e.charging=0; e.vx=-e.chargeDir*4; e.attackCd=0.9;
       }
       physics(e, dt);
@@ -1363,7 +1362,7 @@ function updateFight(dt){
       if(e.rammer && e.chargeCd<=0 && e.onGround && d > reach+30 && d < reach+230 && Math.abs(e.y-p.y)<40){
         e.charging = 0.9; e.chargeDir = Math.sign(p.x - e.x)||1; e.facing = e.chargeDir;
         e.chargeCd = 4 + Math.random()*2.5; e.pose='charge'; e.poseT=0;
-        addPopup(e.x, e.y-120*e.scale, 'SZARŻA! 🐏', '#ffd43b');
+        addPopup(e.x, e.y-120*e.scale, 'CHARGE! 🐏', '#ffd43b');
         beep(180,0.14,'sawtooth',0.07,70);
         physics(e, dt); continue;
       }
@@ -1782,7 +1781,7 @@ function updateWin(dt){
       sndWhistle();
     }
   }
-  // ===== FINAŁ: wchodzi PANI GOSIA, kierowniczka basenu =====
+  // ===== FINAŁ: wchodzi MS GOSIA, kierowniczka basenu =====
   else if(cut.phase==='gosiaCome'){
     p.pose='idle';
     gosia.walkT += dt*9; gosia.pose='walk';
@@ -2570,7 +2569,7 @@ function drawLightning(x1, y1, x2, y2, seg, amp, col, w){
   ctx.lineTo(x2, y2); ctx.stroke();
 }
 
-// ---------- PANI GOSIA — kierowniczka basenu, gwizdek i packa elektryczna ----------
+// ---------- MS GOSIA — kierowniczka basenu, gwizdek i packa elektryczna ----------
 function drawGosia(){
   const g = gosia;
   if(!g || !g.shown) return;
@@ -2703,7 +2702,7 @@ function drawGosia(){
   ctx.restore();
 
   // tabliczka wyżej niż u Grega — stoją blisko siebie, imiona nie mogą na siebie wchodzić
-  nameTag('PANI GOSIA', g.x, g.y - 186 - bob, '#c8ff5e');
+  nameTag('MS GOSIA', g.x, g.y - 186 - bob, '#c8ff5e');
 }
 
 function rr(x, y, w, h, r){
@@ -3852,13 +3851,13 @@ function draw(){
   ctx.textAlign='left'; ctx.font='15px Arial';
   ctx.fillText('💨', 30, 90);
   ctx.font='800 11px '+F; ctx.fillStyle='#cee08c';
-  ctx.fillText('GAZ ŁZAWIĄCY', 54, 82);
+  ctx.fillText('TEAR GAS', 54, 82);
   rr(54, 86, 214, 6, 3); ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fill();
   const gk = 1 - Math.min(1, gasCd/0.42);
   rr(54, 86, Math.max(5, 214*gk), 6, 3);
   ctx.fillStyle = gk >= 1 ? '#cee08c' : '#8aa04e'; ctx.fill();
   ctx.font='700 9.5px '+F; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,.8)';
-  ctx.fillText(gk>=1 ? 'GOTOWY' : '...', 268, 82);
+  ctx.fillText(gk>=1 ? 'READY' : '...', 268, 82);
   ctx.textAlign='left';
   if(superCharge>=100 && state==='fight'){
     const stxt = touchUI ? '⚡ SUPER READY — tap ⚡' : '⚡ SUPER READY — press L';
@@ -4063,12 +4062,12 @@ function drawStoryPanel(){
   if(storyIdx===0){
     ctx.font='900 56px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.lineJoin='round';
     ctx.lineWidth=10; ctx.strokeStyle='rgba(0,0,0,.45)';
-    ctx.strokeText('GREG I BARANY', W/2, 150);
+    ctx.strokeText('GREG & THE RAMS', W/2, 150);
     const tg=ctx.createLinearGradient(W/2-280,0,W/2+280,0);
     tg.addColorStop(0,'#ffd43b'); tg.addColorStop(0.5,'#ff9c00'); tg.addColorStop(1,'#ff5fa2');
-    ctx.fillStyle=tg; ctx.fillText('GREG I BARANY', W/2, 150);
+    ctx.fillStyle=tg; ctx.fillText('GREG & THE RAMS', W/2, 150);
     ctx.font='600 16px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.fillStyle='#fff';
-    ctx.fillText('— gazuj barany, uwolnij Natalkę 💨 —', W/2, 182);
+    ctx.fillText('— gas the rams, free Natalka 💨 —', W/2, 182);
   }
 }
 
