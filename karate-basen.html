@@ -300,7 +300,7 @@ let score, combo, comboT, hitStop, popups, shocks, items, balls, paused = false;
 let superCharge = 0, flashT = 0, hitFx = [];
 let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1, trail = [], confetti = [], menuOpen = false;
 let waterShots = [], waterCd = 0;
-let gasClouds = [], gasCd = 0, gasPuffs = [];
+let gasClouds = [], gasCd = 0, gasPuffs = [], glassFlies = [];
 let areaPhase = 'travel', banner = null, bannerT = 0, goArrowT = 0, coins = 0;
 let spawnQueue = [], spawnT = 0, roleT = 0, wfx = [], kioskNear = null, kioskMsgT = 0, kioskMsg = '', kioskCd = 0;
 let fightT = 0; // gdy walka się przeciąga, wszyscy ruszają na gracza — zabezpieczenie przed zablokowaniem
@@ -330,7 +330,7 @@ function init(){
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
   superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = []; confetti = [];
-  waterShots = []; waterCd = 0; gasClouds = []; gasCd = 0; gasPuffs = [];
+  waterShots = []; waterCd = 0; gasClouds = []; gasCd = 0; gasPuffs = []; glassFlies = [];
   player = mkFighter(90, {color:'#f5f5f5', beltColor:'#111', hp:diff.php, maxHp:diff.php, facing:1, speed:3.15, name:'GREG',
     dmgPunch:14, dmgKick:20, cheer:true});
   girl = {x: POOL.x - 28, y: GROUND, panicT:0, saved:false, runT:0, yOff:0, rot:0, vx:0, vy:0, sunk:false};
@@ -525,6 +525,8 @@ function spawnNextMob(){
     facing: fromLeft ? 1 : -1, speed:(t.spd[0] + Math.random()*(t.spd[1]-t.spd[0]))*diff.espd,
     dmgPunch:Math.max(1,Math.round(t.dmgP*diff.edmg)), dmgKick:Math.max(1,Math.round(t.dmgK*diff.edmg)),
     scale:t.scale, mass:t.mass, cdBase:t.cd, ranged:!!t.ranged, etype:type,
+    glasses: Math.random() < 0.45,   // baran w okularach — gaz go nie bierze, póki nie zbijesz okularów
+    rammer: (type==='zbir'||type==='gruby') && Math.random() < 0.5,  // baran szarżujący — pędzi i przewraca Grega
     role: 'flanker', side: fromLeft ? -1 : 1, entering: true});
   if(entry === 'drop'){                       // zeskakuje zza baru / z wieży / z kabiny
     e.x = Math.max(a.x0 + 40, Math.min(a.x1 - 40, player.x + (fromLeft ? -190 : 190)));
@@ -741,6 +743,14 @@ function updateGas(dt){
       if(e.dead || e.pooled || e.frozen>0) continue;
       const dx = e.x - g.x, dy = (e.y - 46) - g.y;
       if(dx*dx + dy*dy < (g.r*0.9)*(g.r*0.9)){
+        if(e.glasses){
+          // okularnik: gaz go nie bierze — ale chmura zbija mu okulary z nosa
+          e.glasses = false; e.glassLost = 0.0;
+          glassFlies.push({x:e.x, y:e.y-62*e.scale, vx:(e.x>g.x?2:-2)+(Math.random()-0.5), vy:-3-Math.random(), rot:0, vr:0.3, life:1.1});
+          addPopup(e.x, e.y-110*e.scale, 'OKULARY SPADŁY! 👓', '#9adcff');
+          beep(900,0.05,'square',0.05,-300);
+          continue;
+        }
         e.gasT = Math.max(e.gasT||0, 1.4);
         e.hp -= 9 * dt;                   // kaszle i słabnie w chmurze
         if(e.hp <= 0 && !e.dead){ e.dead = true; e.pose='ko'; addScore(25, e.x, e.y-100); }
@@ -750,6 +760,9 @@ function updateGas(dt){
   gasClouds = gasClouds.filter(g => g.life > 0 && g.r > 3);
   for(const pf of gasPuffs){ pf.x += pf.vx; pf.y += pf.vy; pf.vy -= 0.01; pf.r += dt*14; pf.life -= dt; }
   gasPuffs = gasPuffs.filter(pf => pf.life > 0);
+  for(const gf of glassFlies){ gf.x += gf.vx; gf.y += gf.vy; gf.vy += 0.35; gf.rot += gf.vr; gf.life -= dt;
+    if(gf.y > GROUND-4){ gf.y = GROUND-4; gf.vy *= -0.4; gf.vx *= 0.6; } }
+  glassFlies = glassFlies.filter(gf => gf.life > 0);
 }
 
 // ---------- TECHNIKI KARATE ----------
@@ -1118,6 +1131,24 @@ function updateFight(dt){
       physics(e, dt);
       continue;
     }
+    // BARAN SZARŻUJE — pochyla łeb i pędzi, żeby przewrócić Grega
+    e.chargeCd = Math.max(0, (e.chargeCd||0) - dt);
+    if(e.charging > 0){
+      e.charging -= dt; e.pose = 'charge';
+      e.vx = e.chargeDir * 8.2; e.moveVx = 0; e.walkT += dt*22;
+      if(Math.random()<0.5) particles.push({x:e.x - e.chargeDir*12, y:GROUND, vx:-e.chargeDir*2, vy:-Math.random()*2, life:0.35, color:'#e0cda8'});
+      if(Math.abs(e.x - p.x) < 30*e.scale && p.invuln<=0 && !p.dead && !p.blocking){
+        p.hp -= e.dmgPunch; p.hurtT=0.6; p.invuln=1.0; combo=0; dmgVig=0.75;
+        p.vx = e.chargeDir*13; p.vy=-5.5; p.onGround=false; p.moveVx=0; p.pose='hit'; p.poseT=0; p.squash=0.2;
+        shake=Math.max(shake,10); hitStop=Math.max(hitStop,0.06);
+        beep(85,0.16,'sine',0.11,-40); beep(300,0.1,'sawtooth',0.06,-150);
+        addPopup(p.x, p.y-150, 'BARAN CIĘ PRZEWRÓCIŁ! 🐏', '#ff8a8a');
+        e.charging=0; e.vx=-e.chargeDir*4; e.attackCd=0.9;
+      }
+      physics(e, dt);
+      if(e.charging<=0){ e.pose='idle'; e.poseT=0; e.attackCd=Math.max(e.attackCd,0.7); }
+      continue;
+    }
     // wejście z góry — zeskok zza baru, z wieży albo z dachu kabiny
     if(!e.isArek && e.pose === 'slam'){
       physics(e, dt);
@@ -1224,6 +1255,14 @@ function updateFight(dt){
     e.strafeT -= dt;
     if(e.strafeT <= 0){ e.strafeT = 0.45 + Math.random()*0.8; e.strafeDir = Math.random()<0.5 ? -1 : 1; }
     if(e.hurtT<=0){
+      // BARAN rozpoczyna szarżę z średniego dystansu
+      if(e.rammer && e.chargeCd<=0 && e.onGround && d > reach+30 && d < reach+230 && Math.abs(e.y-p.y)<40){
+        e.charging = 0.9; e.chargeDir = Math.sign(p.x - e.x)||1; e.facing = e.chargeDir;
+        e.chargeCd = 4 + Math.random()*2.5; e.pose='charge'; e.poseT=0;
+        addPopup(e.x, e.y-120*e.scale, 'SZARŻA! 🐏', '#ffd43b');
+        beep(180,0.14,'sawtooth',0.07,70);
+        physics(e, dt); continue;
+      }
       const attacker = e.isArek || e.role === 'attacker' || fightT > 40;
       if(attacker && d <= reach + 8 && e.attackCd<=0){
         const kick = Math.random()<0.38;
@@ -1816,6 +1855,11 @@ function drawStick(f){
     armF={a:2.45+w,b:2.75}; armB={a:2.2-w,b:2.6};
     lean = -0.16; bob = Math.abs(Math.sin(f.walkT))*2.2;
     legF={a:0.2,b:0.3}; legB={a:-0.2,b:0.3}; }
+  if(f.pose==='charge'){ // baran pędzi z pochylonym łbem — ręce do tyłu
+    const rn = Math.sin(f.walkT);
+    lean = 0.5; bob = Math.abs(Math.cos(f.walkT))*2.4;
+    armF={a:-0.35,b:1.1}; armB={a:0.45,b:1.15};
+    legF={a:0.85*rn,b:0.45}; legB={a:-0.85*rn,b:0.45}; }
   if(f.pose==='upper'){ // podbródkowy — całe ciało wystrzela w górę za pięścią
     const k = t<0.12 ? t/0.12 : Math.max(0, 1-(t-0.12)/0.2);
     armF={a:2.9*k + 0.75*(1-k), b:2.95*k + 2.2*(1-k)}; armB={a:0.2,b:1.9};
@@ -1899,11 +1943,22 @@ function drawStick(f){
   ctx.fillStyle='rgba(0,0,0,0.16)'; ctx.fillRect(2*s, sh.y-8*s, shW+6*s, 46*s);
   ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(-shW-6*s, sh.y-8*s, 6*s, 46*s);
   if(f.cheer){
-    // biały kołnierzyk „V" + pas ozdobny na topie cheerleaderki
+    // top cheerleaderki: biały szewron „V" + lamówki rękawów + złota lamówka talii
     ctx.fillStyle='#fff';
-    ctx.beginPath(); ctx.moveTo(-shW*0.75, sh.y+2*s); ctx.lineTo(0, sh.y+11*s); ctx.lineTo(shW*0.75, sh.y+2*s);
-    ctx.lineTo(shW*0.5, sh.y+5*s); ctx.lineTo(0, sh.y+8*s); ctx.lineTo(-shW*0.5, sh.y+5*s); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#ffd43b'; ctx.fillRect(-shW, hip.y-6*s, shW*2, 3*s); // złoty pasek
+    // górny biały szewron (grubszy)
+    ctx.beginPath(); ctx.moveTo(-shW*0.82, sh.y+1*s); ctx.lineTo(0, sh.y+12*s); ctx.lineTo(shW*0.82, sh.y+1*s);
+    ctx.lineTo(shW*0.55, sh.y+1*s); ctx.lineTo(0, sh.y+8*s); ctx.lineTo(-shW*0.55, sh.y+1*s); ctx.closePath(); ctx.fill();
+    // drugi, cieńszy szewron (akcent)
+    ctx.fillStyle='#ffd43b';
+    ctx.beginPath(); ctx.moveTo(-shW*0.6, sh.y+9*s); ctx.lineTo(0, sh.y+15*s); ctx.lineTo(shW*0.6, sh.y+9*s);
+    ctx.lineTo(shW*0.44, sh.y+9*s); ctx.lineTo(0, sh.y+12.5*s); ctx.lineTo(-shW*0.44, sh.y+9*s); ctx.closePath(); ctx.fill();
+    // biała lamówka przy ramionach
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2*s;
+    ctx.beginPath(); ctx.moveTo(-shW,sh.y+3*s); ctx.lineTo(-shW*0.6,sh.y+5*s);
+    ctx.moveTo(shW,sh.y+3*s); ctx.lineTo(shW*0.6,sh.y+5*s); ctx.stroke();
+    // złota lamówka talii
+    ctx.fillStyle='#ffd43b'; ctx.fillRect(-hipW-1*s, hip.y-6*s, (hipW+1*s)*2, 3*s);
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(-hipW-1*s, hip.y-6*s, (hipW+1*s)*2, 1*s);
   } else if(gi){ ctx.strokeStyle='rgba(0,0,0,.16)'; ctx.lineWidth=1.6*s;
     ctx.beginPath(); ctx.moveTo(1*s,sh.y-2*s); ctx.lineTo(-3*s,hip.y+4*s); ctx.stroke(); }
   ctx.restore();
@@ -1915,16 +1970,24 @@ function drawStick(f){
 
   // --- PAS / SPÓDNICZKA ---
   if(f.cheer){
-    // plisowana spódniczka cheerleaderki (wachlarz niebiesko-białych klinów)
-    const sw0 = hipW*1.7, sy = hip.y-1*s, slen = 20*s, pl = 7;
+    // plisowana spódniczka cheerleaderki — gęste plisy z cieniowaniem fałd
+    const sw0 = hipW*1.8, sy = hip.y-1*s, slen = 22*s, pl = 10;
     for(let i=0;i<pl;i++){
       const x0 = -sw0 + (i/pl)*sw0*2, x1 = -sw0 + ((i+1)/pl)*sw0*2;
-      ctx.fillStyle = i%2 ? '#eaf2ff' : '#2f74d8';
+      const base = i%2 ? '#2f74d8' : '#eaf2ff';
       ctx.beginPath(); ctx.moveTo(x0, sy); ctx.lineTo(x1, sy);
-      ctx.lineTo((x1)*1.12, sy+slen); ctx.lineTo((x0)*1.12, sy+slen); ctx.closePath(); ctx.fill();
+      ctx.lineTo(x1*1.14, sy+slen); ctx.lineTo(x0*1.14, sy+slen); ctx.closePath();
+      ctx.fillStyle = base; ctx.fill();
+      // cień fałdy po prawej krawędzi plisy
+      ctx.fillStyle='rgba(0,0,0,0.12)';
+      ctx.beginPath(); ctx.moveTo(x1-1.2*s, sy); ctx.lineTo(x1, sy); ctx.lineTo(x1*1.14, sy+slen); ctx.lineTo(x1*1.14-1.4*s, sy+slen); ctx.closePath(); ctx.fill();
     }
-    ctx.fillStyle='rgba(0,0,0,.14)'; ctx.fillRect(-sw0, sy+slen-2*s, sw0*2*1.12, 2*s);
-    ctx.fillStyle='#ffd43b'; ctx.fillRect(-sw0, sy-1*s, sw0*2, 2.4*s); // pasek w talii
+    // dolna lamówka + cień
+    ctx.fillStyle='#1b3a8f'; ctx.fillRect(-sw0*1.14, sy+slen-2.5*s, sw0*2*1.14, 2.5*s);
+    ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(-sw0*1.14, sy+slen, sw0*2*1.14, 1.5*s);
+    // pasek w talii
+    ctx.fillStyle='#ffd43b'; ctx.fillRect(-sw0, sy-1.5*s, sw0*2, 3*s);
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(-sw0, sy-1.5*s, sw0*2, 1*s);
   } else if(f.beltColor){
     ctx.fillStyle=f.beltColor;
     ctx.fillRect(-hipW-1.5*s, hip.y-3.5*s, (hipW+1.5*s)*2, 6*s);
@@ -1952,7 +2015,22 @@ function drawStick(f){
   ctx.beginPath(); ctx.arc(0, headY, headR-0.5*s, Math.PI*0.75, Math.PI*1.75); ctx.stroke();
 
   if(gi){
-    // twarz Grega — zdeterminowane oczy + brew + opaska z powiewającą wstążką
+    // CIEMNE WŁOSY — czapa na górze głowy + objętość z tyłu + grzywka
+    ctx.fillStyle = hurtFlash ? '#5a4a42' : '#241e1b';
+    ctx.beginPath(); ctx.arc(0, headY, headR+0.6*s, Math.PI*0.96, Math.PI*2.04); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-headR*0.55, headY-1*s, headR*0.5, headR*0.85, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-headR*0.9, headY-1*s);
+    ctx.quadraticCurveTo(-1*s, headY-headR-1.5*s, headR*0.6, headY-2.5*s);
+    ctx.quadraticCurveTo(0, headY+0.5*s, -headR*0.9, headY-1*s); ctx.fill();
+    // BRODA — ciemny zarost wokół żuchwy
+    ctx.beginPath();
+    ctx.arc(0, headY, headR+0.4*s, 0.12*Math.PI, 0.88*Math.PI);
+    ctx.arc(0, headY+2.5*s, headR*0.55, 0.88*Math.PI, 0.12*Math.PI, true);
+    ctx.closePath(); ctx.fill();
+    // baki łączące włosy z brodą
+    ctx.fillRect(-headR*0.95, headY-1*s, 2*s, headR*0.9);
+    ctx.save(); ctx.scale(-1,1); ctx.fillRect(-headR*0.95-2*s, headY-1*s, 2*s, headR*0.9); ctx.restore();
+    // twarz Grega — zdeterminowane oczy + brew
     ctx.fillStyle='#233';
     ctx.beginPath(); ctx.arc(3.5*s, headY, 1.6*s, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(8*s, headY, 1.6*s, 0, Math.PI*2); ctx.fill();
@@ -2001,6 +2079,16 @@ function drawStick(f){
     // opaska w kolorze pasa
     if(f.beltColor){ ctx.strokeStyle=f.beltColor; ctx.lineWidth=3*s;
       ctx.beginPath(); ctx.arc(0, headY, headR+0.2*s, Math.PI*1.08, Math.PI*1.92); ctx.stroke(); }
+    // OKULARY przeciwsłoneczne — chronią przed gazem, trzeba je zbić
+    if(f.glasses){
+      ctx.fillStyle='rgba(15,20,30,0.92)'; ctx.strokeStyle='#000'; ctx.lineWidth=1.4*s;
+      ctx.beginPath(); ctx.ellipse(3.5*s, headY-0.3*s, 3.2*s, 2.6*s, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(8.2*s, headY-0.3*s, 3.2*s, 2.6*s, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.lineWidth=1.6*s; ctx.beginPath(); ctx.moveTo(5.9*s,headY-0.6*s); ctx.lineTo(5.9*s,headY-0.6*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(6.4*s,headY-0.8*s); ctx.lineTo(5.3*s,headY-0.8*s); ctx.stroke(); // mostek
+      ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1*s;
+      ctx.beginPath(); ctx.moveTo(2*s,headY-1.4*s); ctx.lineTo(4*s,headY-1.6*s); ctx.stroke(); // błysk
+    }
     // charakterystyczne akcesoria — rozpoznasz typ wroga na pierwszy rzut oka
     if(f.etype==='szybki'){ // punkowy irokez
       ctx.fillStyle=f.beltColor||'#09f';
@@ -2428,16 +2516,29 @@ function drawGirl(){
   ctx.beginPath(); ctx.ellipse(-6*s,-1*s,4.5*s,2.6*s,0,0,Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.ellipse(6*s,-1*s,4.5*s,2.6*s,0,0,Math.PI*2); ctx.fill();
 
-  // SUKIENKA (różowa, wypełniona z cieniem)
-  ctx.fillStyle='#ff5fa2';
+  // KOSZULKA BASEBALLOWA z numerem 20 (biała w prążki, granatowe wykończenia)
   ctx.beginPath();
-  ctx.moveTo(-7*s,-58*s); ctx.lineTo(7*s,-58*s);
+  ctx.moveTo(-8*s,-58*s); ctx.lineTo(8*s,-58*s);
   ctx.lineTo(15*s,-26*s); ctx.quadraticCurveTo(0,-22*s,-15*s,-26*s);
-  ctx.closePath(); ctx.fill();
-  ctx.save(); ctx.clip(); ctx.fillStyle='rgba(0,0,0,.12)'; ctx.fillRect(1*s,-58*s,16*s,40*s); ctx.restore();
-  // ramiączka
-  ctx.strokeStyle='#ff8ac0'; ctx.lineWidth=2.4*s;
-  ctx.beginPath(); ctx.moveTo(-6*s,-58*s); ctx.lineTo(-3*s,-64*s); ctx.moveTo(6*s,-58*s); ctx.lineTo(3*s,-64*s); ctx.stroke();
+  ctx.closePath();
+  ctx.fillStyle='#f4f6fb'; ctx.fill();
+  ctx.save(); ctx.clip();
+  // prążki (pinstripes)
+  ctx.strokeStyle='rgba(30,50,110,0.25)'; ctx.lineWidth=1*s;
+  for(let xx=-14; xx<=14; xx+=4){ ctx.beginPath(); ctx.moveTo(xx*s,-60*s); ctx.lineTo(xx*s,-22*s); ctx.stroke(); }
+  // cień z prawej
+  ctx.fillStyle='rgba(0,0,0,.08)'; ctx.fillRect(3*s,-58*s,14*s,40*s);
+  // guziki na środku
+  ctx.fillStyle='rgba(30,50,110,0.5)'; for(let yy=-54;yy<=-30;yy+=6){ ctx.fillRect(-0.6*s,yy*s,1.2*s,2*s); }
+  // NUMER 20
+  ctx.fillStyle='#1b3a8f'; ctx.font='bold '+(13*s)+'px Arial'; ctx.textAlign='center';
+  ctx.fillText('20', 0, -37*s);
+  ctx.restore();
+  // granatowy kołnierzyk + lamówki rękawów
+  ctx.strokeStyle='#1b3a8f'; ctx.lineWidth=2.4*s;
+  ctx.beginPath(); ctx.moveTo(-6*s,-58*s); ctx.lineTo(0,-54*s); ctx.lineTo(6*s,-58*s); ctx.stroke();
+  ctx.lineWidth=2*s;
+  ctx.beginPath(); ctx.moveTo(-15*s,-27*s); ctx.quadraticCurveTo(0,-23*s,15*s,-27*s); ctx.stroke(); // dolna lamówka
 
   // RĘCE
   ctx.strokeStyle=skin; ctx.lineWidth=4.2*s;
@@ -3138,6 +3239,16 @@ function draw(){
       ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(g.x+ox, g.y+oy, rr0, 0, Math.PI*2); ctx.fill();
     }
   }
+  // strącone okulary lecące w powietrzu
+  for(const gf of glassFlies){
+    ctx.save(); ctx.translate(gf.x, gf.y); ctx.rotate(gf.rot); ctx.globalAlpha=Math.min(1,gf.life);
+    ctx.strokeStyle='#111'; ctx.lineWidth=2.2; ctx.fillStyle='rgba(40,50,70,0.55)';
+    ctx.beginPath(); ctx.arc(-4,0,3.4,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(4,0,3.4,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-1,0); ctx.lineTo(1,0); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
   // dymki punktów — z animacją pop-in (skalowanie)
   for(const p of popups){
     const age = 1 - p.life; // 0 przy pojawieniu → 1 przy zniknięciu
@@ -3159,6 +3270,28 @@ function draw(){
   if(!G.vig){ G.vig = ctx.createRadialGradient(W/2, H*0.46, H*0.35, W/2, H*0.5, H*0.95);
     G.vig.addColorStop(0,'rgba(0,0,0,0)'); G.vig.addColorStop(1,'rgba(10,14,30,0.32)'); }
   ctx.fillStyle=G.vig; ctx.fillRect(-OX,0,VW,H);
+  // ====== KINOWY POST-PROCESSING (premium look) ======
+  // 1) golden-hour grade — ciepła góra, chłodny cień
+  if(!G.grade){ G.grade = ctx.createLinearGradient(0,0,0,H);
+    G.grade.addColorStop(0,'rgba(255,198,128,0.85)');
+    G.grade.addColorStop(0.5,'rgba(255,240,220,0.0)');
+    G.grade.addColorStop(1,'rgba(36,54,110,0.55)'); }
+  ctx.save(); ctx.globalCompositeOperation='soft-light'; ctx.globalAlpha=0.42;
+  ctx.fillStyle=G.grade; ctx.fillRect(-OX,0,VW,H); ctx.restore();
+  // 2) bloom od słońca (lewa-góra)
+  if(!G.bloom){ G.bloom=ctx.createRadialGradient(W*0.11,H*0.13,0,W*0.11,H*0.13,H*0.95);
+    G.bloom.addColorStop(0,'rgba(255,224,150,0.26)'); G.bloom.addColorStop(0.42,'rgba(255,212,140,0.07)'); G.bloom.addColorStop(1,'rgba(255,212,140,0)'); }
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.fillStyle=G.bloom; ctx.fillRect(-OX,0,VW,H); ctx.restore();
+  // 3) ziarno filmowe (kafelek szumu)
+  if(!G.grainTried){ G.grainTried=true;
+    try{ if(typeof document!=='undefined' && document.createElement){
+      const gc=document.createElement('canvas'); gc.width=gc.height=128; const gx=gc.getContext('2d');
+      const idt=gx.createImageData(128,128); for(let i=0;i<idt.data.length;i+=4){ const v=190+(Math.random()*65|0); idt.data[i]=idt.data[i+1]=idt.data[i+2]=v; idt.data[i+3]=255; }
+      gx.putImageData(idt,0,0); G.grainPat=ctx.createPattern(gc,'repeat');
+    } }catch(e){}
+  }
+  if(G.grainPat){ ctx.save(); ctx.globalAlpha=0.05; ctx.globalCompositeOperation='overlay';
+    ctx.translate((Math.random()*18|0)-9,(Math.random()*18|0)-9); ctx.fillStyle=G.grainPat; ctx.fillRect(-OX-20,-20,VW+40,H+40); ctx.restore(); }
   // czerwona winieta bólu (gdy Greg oberwie)
   if(dmgVig > 0){
     const rv = ctx.createRadialGradient(W/2, H*0.5, H*0.3, W/2, H*0.5, H*0.85);
