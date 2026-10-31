@@ -97,12 +97,12 @@
     <div class="tbtn tbtn-gas" data-k="j" title="Gas forward">💨</div>
   </div>
 </div>
-<div id="hint">You are Greg in a cheerleader dress 💙 — gas every ram with tear gas and free Natalka! Watch out for Ms Gosia.</div>
+<div id="hint">You are Greg in a cheerleader dress 💙 — blast every ram and free Natalka! Watch out for Ms Gosia.</div>
 <div id="rotate"><div class="big">📱</div><div>Rotate your phone<br>to play 🥋</div></div>
 <div id="diffmenu">
   <div class="dm-title">📣 GREG &amp; THE RAMS 💨</div>
   <div class="dm-btns">
-    <button class="dm" data-d="normal"><b>▶ PLAY</b><span>Gas the rams &middot; free Natalka</span></button>
+    <button class="dm" data-d="normal"><b>▶ PLAY</b><span>Blast the rams &middot; free Natalka</span></button>
   </div>
   <div class="dm-hint">tap PLAY &nbsp;·&nbsp; or press Enter / Space</div>
 </div>
@@ -136,7 +136,7 @@ let camX = 0;
 // fabuła + tryb dotykowy (deklaracje wcześnie — używane w kodzie startowym)
 let storyIdx = 0, storyLast = 0, storyCast = null, touchUI = false;
 const STORY = [
-  {t:'POOLSIDE KARATE',  s:'A hot afternoon at Palm Cove. Greg is walking the length of the resort with a ring in his pocket and one plan: ask Natalka by the water, at the deep end, before sunset.'},
+  {t:'GREG & THE RAMS',  s:'A hot afternoon at Palm Cove. Greg is walking the length of the resort with a ring in his pocket and one plan: ask Natalka by the water, at the deep end, before sunset.'},
   {t:'THE HOUSE RULES',  s:'Ms Gosia runs Palm Cove. One rule, printed on every sign: ABSOLUTELY NO FIGHTING. She patrols with a whistle, a clipboard — and an electric fly swatter.'},
   {t:'THEY TAKE THE RESORT', s:'Mr Arek’s crew sweep in and take the place — boardwalk, bar, cabins, the lot. They corner Natalka at the deep end. “Nobody reads at MY pool.”'},
   {t:'ONE HERO STANDS',  s:'Greg is at the far gate. Eight places between him and her. He could go and find a lifeguard. He rolls up his sleeves instead.'},
@@ -298,6 +298,7 @@ let camPunch = 0, slowmo = 0, dustT = 0, dmgVig = 0, hpShown = 1, hpGhost = 1, t
 let waterShots = [], waterCd = 0;
 let gasClouds = [], gasCd = 0, gasPuffs = [], glassFlies = [];
 let witches = [], pumpkins = [], pumpkinSplats = [], bats = [], floatSkulls = [], hallGlow = []; // Halloween: wiedźmy na miotłach, dynie, nietoperze
+let shots = []; // pociski Grega — strzela zamiast gazu
 let areaPhase = 'travel', banner = null, bannerT = 0, goArrowT = 0, coins = 0;
 let spawnQueue = [], spawnT = 0, roleT = 0, wfx = [], kioskNear = null, kioskMsgT = 0, kioskMsg = '', kioskCd = 0;
 let fightT = 0; // gdy walka się przeciąga, wszyscy ruszają na gracza — zabezpieczenie przed zablokowaniem
@@ -328,7 +329,7 @@ function init(){
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
   superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = []; confetti = [];
   waterShots = []; waterCd = 0; gasClouds = []; gasCd = 0; gasPuffs = []; glassFlies = [];
-  witches = []; pumpkins = []; pumpkinSplats = []; floatSkulls = []; hallGlow = [];
+  witches = []; pumpkins = []; pumpkinSplats = []; floatSkulls = []; hallGlow = []; shots = [];
   spawnWitches();
   bats = []; for(let i=0;i<10;i++) bats.push({x:Math.random()*WORLD_W, y:70+Math.random()*120, ph:Math.random()*6.28, sp:0.4+Math.random()*0.5, sc:0.5+Math.random()*0.6});
   player = mkFighter(90, {color:'#f5f5f5', beltColor:'#111', hp:diff.php, maxHp:diff.php, facing:1, speed:3.15, name:'GREG',
@@ -780,30 +781,76 @@ function fireWater(p){
 }
 
 // ---------- GAZ ŁZAWIĄCY (jedyna broń Grega) ----------
+// GREG STRZELA (zamiast gazu) — pocisk w stronę przodu, w górę albo skosem.
 function sprayGas(p, forceUp){
-  gasCd = 0.3;
-  // W górę: skok+gaz albo dedykowany przycisk „gaz w górę". Trzymając ←/→ przy tym — gaz leci SKOSEM.
-  const up = forceUp || !p.onGround;
-  p.pose = 'spray'; p.poseT = 0;
+  gasCd = 0.26;                          // tempo ognia
+  const up = forceUp || !p.onGround;     // U/I lub skok+strzał = w górę; trzymany ←/→ = skos
+  p.pose = 'shoot'; p.poseT = 0;
+  const SP = 660;                        // prędkość pocisku (px/s)
+  let vx, vy, mx, my, isUp = false;
   if(up){
     const diagH = (keys['arrowleft']||keys['a']) ? -1 : (keys['arrowright']||keys['d']) ? 1 : 0;
-    const vx = diagH!==0 ? diagH*4.4 : p.facing*1.1;   // skos, gdy trzymany kierunek; inaczej pionowo
-    if(diagH!==0) p.facing = diagH;
-    const mx = p.x + diagH*14, my = p.y - 70*p.scale;
-    // słup gazu pnie się w górę (lub ukośnie) — dosięga wiedźm
-    gasClouds.push({x:mx, y:my, vx, vy:-7.2, r:14, maxR:86+Math.random()*14, life:3.4, seed:Math.random()*99, owner:'player', up:true});
-    for(let i=0;i<12;i++) gasPuffs.push({x:mx, y:my, vx:vx*0.4+(Math.random()-0.5)*3, vy:-4-Math.random()*4, r:3+Math.random()*4, life:0.5+Math.random()*0.3});
-    if(!p.onGround) p.vy += 0.6;        // w locie: lekki odrzut w dół
+    if(diagH!==0){ p.facing = diagH; vx = diagH*SP*0.62; vy = -SP*0.82; }  // skos
+    else { vx = p.facing*SP*0.12; vy = -SP; }                              // prosto w górę
+    mx = p.x + Math.sign(vx||p.facing)*12; my = p.y - 72*p.scale; isUp = true;
+    if(!p.onGround) p.vy += 0.5;
   } else {
-    p.moveVx -= p.facing * 1.0;          // lekki odrzut od puszki
-    const mx = p.x + p.facing*26*p.scale, my = p.y - 56*p.scale;
-    // chmura gazu leci przed siebie, rośnie i rozwiewa się (mocna, szeroka)
-    gasClouds.push({x:mx, y:my, vx:p.facing*5.0, vy:-0.5, r:14, maxR:98+Math.random()*16, life:3.2, seed:Math.random()*99, owner:'player'});
-    for(let i=0;i<10;i++) gasPuffs.push({x:mx, y:my, vx:p.facing*(3+Math.random()*3), vy:(Math.random()-0.5)*2.4, r:3+Math.random()*4, life:0.4+Math.random()*0.3});
+    p.moveVx -= p.facing * 0.8;          // lekki odrzut
+    vx = p.facing*SP; vy = -40;          // lekki łuk
+    mx = p.x + p.facing*28*p.scale; my = p.y - 56*p.scale;
   }
-  beep(2200, 0.18, 'sawtooth', 0.025, -1600); // „pssssst"
-  beep(520, 0.1, 'triangle', 0.02, -200);
-  camPunch = Math.max(camPunch, 0.015);
+  shots.push({x:mx, y:my, vx, vy, r:7, life:0.95, up:isUp, hit:false, trail:[]});
+  // błysk z wylotu
+  for(let i=0;i<5;i++) particles.push({x:mx, y:my, vx:(vx/120)+(Math.random()-0.5)*2, vy:(vy/160)+(Math.random()-0.5)*2, life:0.22, color:'rgba(180,235,255,0.9)'});
+  beep(1400, 0.08, 'square', 0.03, -900);   // „pew"
+  beep(620, 0.06, 'triangle', 0.02, -300);
+  camPunch = Math.max(camPunch, 0.02);
+}
+
+// lot i trafienia pocisków Grega
+function updateShots(dt){
+  for(const s of shots){
+    s.trail.push({x:s.x, y:s.y}); if(s.trail.length>6) s.trail.shift();
+    s.vy += 900*dt;                      // grawitacja (łagodny łuk)
+    s.x += s.vx*dt; s.y += s.vy*dt;
+    s.life -= dt;
+    if(s.hit){ continue; }
+    // barany: okularnikowi najpierw zbijamy okulary, potem obrywa
+    for(const e of enemies){
+      if(e.dead || e.pooled || e.frozen>0) continue;
+      const dx = e.x - s.x, dy = (e.y - 46*e.scale) - s.y;
+      if(dx*dx + dy*dy < (s.r + 26*e.scale)*(s.r + 26*e.scale)){
+        if(e.glasses){
+          e.glasses = false;
+          glassFlies.push({x:e.x, y:e.y-62*e.scale, vx:(e.x>s.x?2:-2)+(Math.random()-0.5), vy:-3-Math.random(), rot:0, vr:0.3, life:1.1});
+          addPopup(e.x, e.y-110*e.scale, 'GLASSES OFF! 👓', '#9adcff');
+          beep(900,0.05,'square',0.05,-300);
+        } else {
+          e.hp -= 16; e.hurtT = 0.3; e.vx += Math.sign(e.x-s.x||1)*3; e.pose='hit'; e.poseT=0;
+          burst(s.x, s.y, '#bfeaff', 8); beep(260,0.08,'square',0.05,-200);
+          if(e.hp <= 0 && !e.dead){ e.dead = true; e.pose='ko'; addScore(25, e.x, e.y-100); burst(e.x, e.y-60, '#ffd43b', 12); dropCoins(e.x, 2); }
+        }
+        s.hit = true; s.life = Math.min(s.life, 0.05); break;
+      }
+    }
+    if(s.hit) continue;
+    // wiedźmy na miotłach — strzał w górę je odpędza
+    if(s.up){
+      for(const w of witches){
+        if(w.spook>0) continue;
+        const dx = w.x - s.x, dy = w.y - s.y;
+        if(dx*dx + dy*dy < (s.r + 22)*(s.r + 22)){
+          w.spook = 2.6; w.throwCd = Math.max(w.throwCd, 3.0);
+          addPopup(w.x, w.y-30, 'HIT! 🎯 '+w.name, '#9adcff');
+          addScore(40, w.x, w.y-20); burst(w.x, w.y, '#b6f', 12);
+          beep(300,0.2,'sawtooth',0.04,-200);
+          s.hit = true; s.life = Math.min(s.life, 0.05); break;
+        }
+      }
+    }
+    if(s.y > GROUND-4){ burst(s.x, GROUND-6, '#bfeaff', 6); s.hit = true; s.life = Math.min(s.life, 0.05); }
+  }
+  shots = shots.filter(s => s.life > 0);
 }
 
 function updateGas(dt){
@@ -1066,6 +1113,7 @@ function update(dt){
   for(const b of bats){ b.ph += dt*b.sp*3; b.x -= dt*(10+b.sp*18); if(b.x < camX-120) b.x = camX+W+120+Math.random()*200; }
   updateWitches(dt);
   updatePumpkins(dt);
+  updateShots(dt);
 
   if(state==='fight') updateFight(dt);
   else if(state==='lose') updateLose(dt);
@@ -3707,7 +3755,24 @@ function draw(){
     ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s.r*0.6,-s.r*0.15,s.r*0.3,0,Math.PI*2); ctx.fill();
     ctx.restore();
   }
-  // ---- GAZ ŁZAWIĄCY: kłęby + chmury (miękkie, półprzezroczyste) ----
+  // ---- POCISKI GREGA (strzela zamiast gazu) ----
+  for(const s of shots){
+    // smuga
+    for(let i=0;i<s.trail.length;i++){
+      const t = s.trail[i], a = (i/s.trail.length)*0.5;
+      ctx.fillStyle='rgba(150,220,255,'+a.toFixed(2)+')';
+      ctx.beginPath(); ctx.arc(t.x, t.y, s.r*(0.4+0.5*i/s.trail.length), 0, Math.PI*2); ctx.fill();
+    }
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
+    if(typeof ctx.filter==='string'){ ctx.save(); ctx.filter='blur(4px)';
+      ctx.fillStyle='rgba(120,210,255,0.8)'; ctx.beginPath(); ctx.arc(0,0,s.r*1.8,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    const grd = ctx.createLinearGradient(-s.r*2.2,0,s.r,0);
+    grd.addColorStop(0,'rgba(90,190,255,0)'); grd.addColorStop(1,'rgba(120,220,255,0.95)');
+    ctx.fillStyle=grd; ctx.beginPath(); ctx.ellipse(0,0,s.r*2.2,s.r*0.75,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#eaffff'; ctx.beginPath(); ctx.arc(s.r*0.4,0,s.r*0.6,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  // ---- (pozostałości gazu — kłęby/chmury, zwykle puste) ----
   for(const pf of gasPuffs){
     const a = Math.max(0, pf.life) * 0.5;
     const gg = ctx.createRadialGradient(pf.x, pf.y, 0, pf.x, pf.y, pf.r);
@@ -3828,15 +3893,15 @@ function draw(){
   rr(30,41,238,17,8.5); ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1; ctx.stroke();
   ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='700 10.5px '+F; ctx.textAlign='center';
   ctx.fillText(Math.max(0,player.hp)+' / '+player.maxHp, 149, 54);
-  // wiersz GAZU — jedyna broń Grega, pasek gotowości
+  // wiersz BLASTERA — jedyna broń Grega, pasek gotowości
   ctx.textAlign='left'; ctx.font='15px Arial';
-  ctx.fillText('💨', 30, 90);
-  ctx.font='800 11px '+F; ctx.fillStyle='#cee08c';
-  ctx.fillText('TEAR GAS', 54, 82);
+  ctx.fillText('💥', 30, 90);
+  ctx.font='800 11px '+F; ctx.fillStyle='#9adcff';
+  ctx.fillText('BLASTER', 54, 82);
   rr(54, 86, 214, 6, 3); ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fill();
   const gk = 1 - Math.min(1, gasCd/0.42);
   rr(54, 86, Math.max(5, 214*gk), 6, 3);
-  ctx.fillStyle = gk >= 1 ? '#cee08c' : '#8aa04e'; ctx.fill();
+  ctx.fillStyle = gk >= 1 ? '#9adcff' : '#4a7c96'; ctx.fill();
   ctx.font='700 9.5px '+F; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,.8)';
   ctx.fillText(gk>=1 ? 'READY' : '...', 268, 82);
   ctx.textAlign='left';
@@ -4048,7 +4113,7 @@ function drawStoryPanel(){
     tg.addColorStop(0,'#ffd43b'); tg.addColorStop(0.5,'#ff9c00'); tg.addColorStop(1,'#ff5fa2');
     ctx.fillStyle=tg; ctx.fillText('GREG & THE RAMS', W/2, 150);
     ctx.font='600 16px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial'; ctx.fillStyle='#fff';
-    ctx.fillText('— gas the rams, free Natalka 💨 —', W/2, 182);
+    ctx.fillText('— blast the rams, free Natalka 💥 —', W/2, 182);
   }
 }
 
