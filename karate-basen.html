@@ -324,7 +324,7 @@ function addScore(n, x, y){
 
 function init(){
   time = 0; shake = 0;
-  state = 'story'; storyIdx = 0;
+  state = 'fight'; storyIdx = 0;   // bez wstępu fabularnego — gra startuje od razu (panele „kwadraty z napisami" usunięte)
   particles = []; hearts = []; splashes = [];
   score = 0; combo = 0; comboT = 0; hitStop = 0; popups = []; shocks = []; items = []; balls = []; paused = false;
   superCharge = 0; flashT = 0; hitFx = []; camPunch = 0; slowmo = 0; dustT = 0; dmgVig = 0; hpShown = 1; hpGhost = 1; trail = []; confetti = [];
