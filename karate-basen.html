@@ -503,23 +503,16 @@ const LOOT = [
 
 // dekoracje kurortu — każde miejsce wygląda inaczej, więc widać, że się idzie dalej
 const PROPS = [
-  {t:'palm', x:90},{t:'ball', x:300},{t:'palm', x:640},{t:'sign', x:470, s:'THE BOARDWALK'},
+  {t:'palm', x:90},{t:'ball', x:300},{t:'palm', x:640},
   {t:'palm', x:1010},
-  {t:'sign', x:1130, s:'SUNBED ROW'},
   {t:'lounger', x:1240},{t:'parasol', x:1330},{t:'lounger', x:1420},{t:'parasol', x:1520},{t:'ball', x:1470},
   {t:'palm', x:1700},{t:'ring', x:1780},
-  {t:'sign', x:1790, s:'BEACH BAR'},
   {t:'bar', x:1980},{t:'palm', x:2200},{t:'ball', x:2260},
-  {t:'sign', x:2450, s:'LIFEGUARD TOWER'},
   {t:'tower', x:2680},{t:'ring', x:2860},{t:'palm', x:2960},
-  {t:'sign', x:3110, s:'THE SHOWERS'},
   {t:'shower', x:3250},{t:'shower', x:3420},{t:'palm', x:3560},
-  {t:'sign', x:3770, s:'CHANGING CABINS'},
   {t:'cabin', x:3900, c:'#ff6b6b'},{t:'cabin', x:4020, c:'#4dd0e1'},{t:'cabin', x:4140, c:'#ffd54f'},
   {t:'palm', x:4300},{t:'ball', x:4400},
-  {t:'sign', x:4430, s:'VIP DECK'},
   {t:'plant', x:4560},{t:'rope', x:4700},{t:'plant', x:4850},
-  {t:'sign', x:4960, s:'POOLSIDE'},
   {t:'palm', x:5080},{t:'lounger', x:5180},{t:'parasol', x:5480},{t:'ring', x:POOL.x + 52}
 ];
 
@@ -3441,7 +3434,6 @@ function drawBuilding(type){
     ctx.fillStyle='#8a6b4a'; rr(-w/2-8,-h-14,w+16,16,4); ctx.fill(); // dach
     winGrid(-w/2+10,-h+22, w-20, h-40, 5, 4, true);
     ctx.fillStyle='#2b6fb5'; rr(-22,-34,44,34,3); ctx.fill();      // drzwi/lobby
-    ctx.fillStyle='#ffd43b'; ctx.font='bold 13px Arial'; ctx.textAlign='center'; ctx.fillText('HOTEL', 0,-h+16);
   } else if(type==='bar'){
     const w=130,h=74;
     ctx.fillStyle='#caa26a'; rr(-w/2,-h,w,h,5); ctx.fill();
@@ -3450,7 +3442,6 @@ function drawBuilding(type){
     ctx.fillStyle='#c79a4f'; ctx.beginPath(); ctx.moveTo(-w/2-16,-h); ctx.lineTo(0,-h-36); ctx.lineTo(w/2+16,-h); ctx.closePath(); ctx.fill();
     ctx.fillStyle='#a87f3c'; for(let i=-3;i<=3;i++){ ctx.beginPath(); ctx.moveTo(i*10,-h); ctx.lineTo(i*8,-h-30); ctx.lineTo(i*10+4,-h); ctx.fill(); }
     ctx.fillStyle='#4a3524'; ctx.fillRect(-w/2+8,-34,w-16,8); // bar
-    ctx.fillStyle='#ffd43b'; ctx.font='bold 12px Arial'; ctx.textAlign='center'; ctx.fillText('TIKI BAR', 0,-h-6);
   } else if(type==='cabana'){
     const w=96,h=70;
     // paski markizy
@@ -3466,7 +3457,6 @@ function drawBuilding(type){
     ctx.fillStyle='#d94f4f'; rr(-w/2,-h+10,w,46,4); ctx.fill();       // kabina
     ctx.fillStyle='#fff'; ctx.fillRect(-w/2+6,-h+18,w-12,16);          // okno
     ctx.fillStyle='#b5392f'; ctx.beginPath(); ctx.moveTo(-w/2-6,-h+10); ctx.lineTo(0,-h-14); ctx.lineTo(w/2+6,-h+10); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#fff'; ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.fillText('LIFEGUARD',0,-h-18);
   } else if(type==='icecream'){
     const w=80,h=60;
     const g=ctx.createLinearGradient(0,-h,0,0); g.addColorStop(0,'#ffe0ec'); g.addColorStop(1,'#ffc0d8');
@@ -3487,13 +3477,11 @@ function drawBuilding(type){
     // deski surfingowe oparte
     [['#ff6b6b',-30],['#ffd43b',-14],['#8bc34a',2]].forEach(([c,dx],i)=>{ ctx.save(); ctx.translate(dx,-6); ctx.rotate(-0.25);
       ctx.fillStyle=c; rr(-5,-52,10,52,5); ctx.fill(); ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(-1,-50,2,48); ctx.restore(); });
-    ctx.fillStyle='#fff'; ctx.font='bold 11px Arial'; ctx.textAlign='center'; ctx.fillText('SURF',0,-h+22);
   } else { // snack
     const w=90,h=58;
     ctx.fillStyle='#e9d7b0'; rr(-w/2,-h,w,h,5); ctx.fill();
     for(let i=0;i<5;i++){ ctx.fillStyle=i%2?'#ffd43b':'#e0564e'; ctx.fillRect(-w/2+i*(w/5),-h-12,w/5,12); }
     ctx.fillStyle='#8a6b4a'; ctx.fillRect(-w/2+8,-h+12,w-16,24);
-    ctx.fillStyle='#c0392b'; ctx.font='bold 12px Arial'; ctx.textAlign='center'; ctx.fillText('SNACKS',0,-h+8);
   }
 }
 
