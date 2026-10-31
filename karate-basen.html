@@ -137,10 +137,10 @@ let camX = 0;
 let storyIdx = 0, storyLast = 0, storyCast = null, touchUI = false;
 const STORY = [
   {t:'POOLSIDE KARATE',  s:'A hot afternoon at Palm Cove. Greg is walking the length of the resort with a ring in his pocket and one plan: ask Natalka by the water, at the deep end, before sunset.'},
-  {t:'THE HOUSE RULES',  s:'Pani Gosia runs Palm Cove. One rule, printed on every sign: ABSOLUTELY NO FIGHTING. She patrols with a whistle, a clipboard — and an electric fly swatter.'},
+  {t:'THE HOUSE RULES',  s:'Ms Gosia runs Palm Cove. One rule, printed on every sign: ABSOLUTELY NO FIGHTING. She patrols with a whistle, a clipboard — and an electric fly swatter.'},
   {t:'THEY TAKE THE RESORT', s:'Mr Arek’s crew sweep in and take the place — boardwalk, bar, cabins, the lot. They corner Natalka at the deep end. “Nobody reads at MY pool.”'},
   {t:'ONE HERO STANDS',  s:'Greg is at the far gate. Eight places between him and her. He could go and find a lifeguard. He rolls up his sleeves instead.'},
-  {t:'FIGHT YOUR WAY EAST', s:'Walk right. Clear each place to open the way. Take what the deck gives you — noodles, umbrellas, flip-flops, ice buckets — and every coin the crew drops. Pani Gosia is listening.'}
+  {t:'FIGHT YOUR WAY EAST', s:'Walk right. Clear each place to open the way. Take what the deck gives you — noodles, umbrellas, flip-flops, ice buckets — and every coin the crew drops. Ms Gosia is listening.'}
 ];
 
 // ---------- audio ----------
@@ -3235,27 +3235,8 @@ function drawScene(){
   });
   ctx.fillStyle='rgba(255,255,255,.4)';
   for(let i=0;i<5;i++){ const yy=HORIZON+10+i*10; ctx.fillRect(BX, yy, BW, 1.5); }
-  // DALEKI SKYLINE KURORTU — mgliste wieżowce na horyzoncie (głęboki parallax = poczucie wielkiego świata)
-  ctx.save(); ctx.globalAlpha=0.5;
-  const sp = fix*0.92;                       // bardzo wolny plan
-  for(let k=0; k<48; k++){
-    const wx = k*140 - (sp % 140);
-    if(wx < -90 || wx > W+90) continue;
-    const seed = ((k*131)%97);
-    const bh = 28 + (seed%5)*11;             // różne wysokości wieżowców
-    const bw = 34 + (seed%3)*9;
-    const col = seed%2 ? '#7fa7c8' : '#8fb2cf';
-    ctx.fillStyle=col;
-    ctx.fillRect(wx, HORIZON-bh, bw, bh);
-    // dach/antena
-    if(seed%3===0){ ctx.fillRect(wx+bw*0.4, HORIZON-bh-8, 2.5, 8); }
-    else if(seed%3===1){ ctx.beginPath(); ctx.moveTo(wx,HORIZON-bh); ctx.lineTo(wx+bw/2,HORIZON-bh-10); ctx.lineTo(wx+bw,HORIZON-bh); ctx.fill(); }
-    // okienka
-    ctx.fillStyle='rgba(255,240,200,0.5)';
-    for(let wy=HORIZON-bh+5; wy<HORIZON-4; wy+=8){ for(let wxx=wx+4; wxx<wx+bw-4; wxx+=8){ if((wxx+wy)%3===0) ctx.fillRect(wxx,wy,3,4); } }
-  }
-  ctx.restore();
-  // mgła atmosferyczna na horyzoncie (łączy skyline z morzem)
+  // (daleki skyline wieżowców usunięty — te prostokąty tylko przeszkadzały)
+  // mgła atmosferyczna na horyzoncie
   const haze=ctx.createLinearGradient(0,HORIZON-50,0,HORIZON+20);
   haze.addColorStop(0,'rgba(200,225,240,0)'); haze.addColorStop(1,'rgba(200,225,240,0.55)');
   ctx.fillStyle=haze; ctx.fillRect(BX,HORIZON-50,BW,70);
