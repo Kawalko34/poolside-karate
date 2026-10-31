@@ -2,11 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="refresh" content="0; url=karate-basen.html">
-<title>Poolside Karate</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Greg &amp; The Rams</title>
 </head>
 <body style="background:#0b0e1e;color:#fff;font-family:sans-serif;text-align:center;padding-top:40vh">
-<a href="karate-basen.html" style="color:#ffd43b">Loading Poolside Karate… tap here if nothing happens</a>
-<script>location.replace('karate-basen.html');</script>
+<a id="go" href="karate-basen.html" style="color:#ffd43b">Loading Greg &amp; The Rams… tap here if nothing happens</a>
+<script>
+// Omijamy cache github.io — zawsze wczytujemy najświeższą wersję gry
+var url = 'karate-basen.html?v=' + Date.now();
+document.getElementById('go').href = url;
+location.replace(url);
+</script>
 </body>
 </html>
